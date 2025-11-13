@@ -230,10 +230,15 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     logs_end_date: String(logsEndDate),
     response_times: "1",
     response_times_limit: String(RESPONSE_TIMES_LIMIT),
+    // 明确请求响应时间的时间范围（API 最多允许 7 天范围）。
+    // 这里默认请求最近 24 小时的数据以供页面图表显示，避免短窗口导致无数据。
+    response_times_start_date: String(dayjs().subtract(24, "hour").unix()),
+    response_times_end_date: String(dayjs().unix()),
     custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
     custom_uptime_ratios: "7-30-90",
   });
 
+  // 执行主请求（带 response_times 时间范围，默认最近 7 天）
   const response = await fetch(API_ENDPOINT, {
     method: "POST",
     headers: {
@@ -248,7 +253,7 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     throw new Error(`UptimeRobot API 请求失败：${response.statusText}`);
   }
 
-  const data = (await response.json()) as UptimeRobotApiResponse;
+  let data = (await response.json()) as UptimeRobotApiResponse;
 
   if (data.stat !== "ok") {
     throw new Error(
@@ -279,5 +284,60 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     console.error("[server debug] failed to log raw monitors", e);
   }
 
-  return (data.monitors ?? []).map(normalizeMonitor);
+  // 如果主请求返回的所有监控的 response_times 都为空，尝试第二次请求不带 start/end
+  const monitors = data.monitors ?? [];
+  const totalResponseTimes = monitors.reduce((acc, m) => acc + (m.response_times?.length ?? 0), 0);
+
+  if (totalResponseTimes === 0 && monitors.length > 0) {
+    try {
+      console.info("[server debug] no response_times in primary request, issuing fallback request without start/end (last 24h)");
+      const fallbackParams = new URLSearchParams({
+        api_key: apiKey,
+        format: "json",
+        logs: "1",
+        logs_limit: "300",
+        log_types: "1-2-99",
+        response_times: "1",
+        response_times_limit: String(RESPONSE_TIMES_LIMIT),
+        custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
+        custom_uptime_ratios: "7-30-90",
+      });
+
+      const fallbackResp = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cache-Control": "no-cache",
+        },
+        body: fallbackParams.toString(),
+        next: { revalidate: 60 },
+      });
+
+      if (fallbackResp.ok) {
+        const fallbackData = (await fallbackResp.json()) as UptimeRobotApiResponse;
+        // 如果 fallback 返回数据，尝试把其 response_times 合并到原 monitors（按 id 匹配）
+        if (fallbackData?.monitors) {
+          const fallbackMap = new Map<number, typeof fallbackData.monitors[0]>();
+          for (const m of fallbackData.monitors) fallbackMap.set(m.id, m as any);
+          for (const m of monitors) {
+            const fb = fallbackMap.get(m.id);
+            if (fb && fb.response_times && fb.response_times.length > 0) {
+              m.response_times = fb.response_times;
+            }
+          }
+
+          // 记录合并后摘要
+          console.groupCollapsed("[server debug] after fallback merge response_times summary");
+          console.log(monitors.map((m) => ({ id: m.id, response_times_len: m.response_times?.length ?? 0 })));
+          console.groupEnd();
+        }
+      } else {
+        console.warn("[server debug] fallback request failed:", fallbackResp.statusText);
+      }
+    } catch (e) {
+      console.error("[server debug] fallback request error", e);
+    }
+  }
+
+  return monitors.map(normalizeMonitor);
 }
