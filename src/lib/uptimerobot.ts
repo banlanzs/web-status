@@ -12,11 +12,10 @@ const API_ENDPOINT = `${API_BASE_URL}/getMonitors`;
 
 // 生成自定义时间范围的函数
 function generateCustomUptimeRanges() {
-  const dates = [];
-  const days = [7, 30, 90];
+  // 生成三个时间段的数据，与 custom_uptime_ratios 参数匹配
   const today = dayjs(new Date().setHours(0, 0, 0, 0));
+  const days = [7, 30, 90];
   
-  // 为每个天数生成范围
   return days.map((day) => {
     const start = today.subtract(day, "day").unix();
     const end = today.unix();
@@ -43,26 +42,19 @@ const MONITOR_TYPE_LABEL: Record<number, string> = {
   5: "Heartbeat",
 };
 
-
-function parseUptime(raw: string | undefined, index: number) {
-  if (!raw) return null;
-  const segments = raw.split("-");
-  if (segments.length <= index) return null;
-  const value = parseFloat(segments[index] ?? "");
-  return Number.isFinite(value) ? value : null;
-}
-
 function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
   if (!logs?.length) {
     return {
       normalized: [],
-      incidents: { total: 0, totalDowntimeSeconds: 0 },
+      incidents: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
     };
   }
 
   const cutoff = dayjs().subtract(90, "day");
   let total = 0;
   let totalDowntimeSeconds = 0;
+  let downCount = 0;  // 宕机次数
+  let pauseCount = 0; // 暂停次数
 
   const normalized = logs
     .map((log) => ({
@@ -80,21 +72,27 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
     );
 
   normalized.forEach((log) => {
-    if (log.type === 1) {
+    // 参考 site-status 项目的实现：
+    // type: 1 表示宕机故障
+    // type: 99 表示监控暂停
+    // 这两种类型都被视为故障事件
+    if (log.type === 1 || log.type === 99) {
       total += 1;
       if (log.duration) totalDowntimeSeconds += log.duration;
+      
+      // 分别统计宕机和暂停次数
+      if (log.type === 1) {
+        downCount += 1;
+      } else if (log.type === 99) {
+        pauseCount += 1;
+      }
     }
   });
 
-  return { normalized, incidents: { total, totalDowntimeSeconds } };
+  return { normalized, incidents: { total, totalDowntimeSeconds, downCount, pauseCount } };
 }
 
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
-  // 添加调试日志以查看处理前的原始数据
-  if (process.env.NODE_ENV === 'development') {
-    console.log("Processing monitor:", monitor.friendly_name, "all_time_uptime_ratio:", monitor.all_time_uptime_ratio);
-  }
-  
   // v2 API 使用 snake_case 字段名
   // 处理响应时间数据，修复日期解析问题
   const now = dayjs();
@@ -151,22 +149,27 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
 
   // 处理 uptime ratio 数据
   const uptimeRatio = {
-    last7Days: parseUptime(monitor.custom_uptime_ratio, 0),
-    last30Days: parseUptime(monitor.custom_uptime_ratio, 1),
-    last90Days: parseUptime(monitor.custom_uptime_ratio, 2),
-    allTime:
-      (typeof monitor.all_time_uptime_ratio === "number" ||
-       typeof monitor.all_time_uptime_ratio === "string") &&
-      !isNaN(Number(monitor.all_time_uptime_ratio)) &&
-      isFinite(Number(monitor.all_time_uptime_ratio))
-        ? Number(monitor.all_time_uptime_ratio)
-        : null,
+    // 90天数据是第三个（索引为2）时间段
+    last90Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length <= 2) return null;
+        const value = parseFloat(segments[2] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
   };
 
-  // 添加调试日志以查看处理后的数据
-  if (process.env.NODE_ENV === 'development') {
-    console.log("Normalized uptimeRatio for", monitor.friendly_name, ":", uptimeRatio);
-  }
+  // 处理宕机时长数据
+  const downDuration = {
+    // 90天数据是第三个（索引为2）时间段
+    last90Days: monitor.custom_down_durations ? 
+      (() => {
+        const segments = monitor.custom_down_durations?.split("-");
+        if (!segments || segments.length <= 2) return null;
+        const value = parseFloat(segments[2] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
+  };
 
   return {
     id: monitor.id,
@@ -179,6 +182,7 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     averageResponseTime,
     lastResponseTime,
     uptimeRatio,
+    downDuration,
     responseTimes,
     logs,
     incidents,
@@ -203,7 +207,8 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     response_times: "1",
     response_times_limit: String(RESPONSE_TIMES_LIMIT),
     custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
-    all_time_uptime_ratio: "1",
+    custom_uptime_ratios: "7-30-90",
+    custom_down_durations: "1",
   });
 
   const response = await fetch(API_ENDPOINT, {
@@ -222,22 +227,10 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
 
   const data = (await response.json()) as UptimeRobotApiResponse;
 
-  // 添加调试日志以查看 API 返回的数据
-  if (process.env.NODE_ENV === 'development') {
-    console.log("UptimeRobot API Response:", JSON.stringify(data, null, 2));
-  }
-
   if (data.stat !== "ok") {
     throw new Error(
       data.error?.message ?? "UptimeRobot API 返回错误，请检查 API Key。",
     );
-  }
-
-  // 添加调试日志以查看处理前的原始数据
-  if (process.env.NODE_ENV === 'development' && data.monitors) {
-    data.monitors.forEach((monitor, index) => {
-      console.log(`Monitor ${index} all_time_uptime_ratio:`, monitor.all_time_uptime_ratio);
-    });
   }
 
   return (data.monitors ?? []).map(normalizeMonitor);

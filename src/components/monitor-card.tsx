@@ -18,11 +18,6 @@ interface MonitorCardProps {
 }
 
 export function MonitorCard({ monitor }: MonitorCardProps) {
-  // 添加调试日志以查看传入组件的数据
-  if (process.env.NODE_ENV === 'development') {
-    console.log("MonitorCard received monitor:", monitor.name, "uptimeRatio:", monitor.uptimeRatio);
-  }
-  
   const { t } = useLanguage();
 
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
@@ -39,7 +34,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
           <span className="text-sm text-slate-500">
             {t("monitor.typeInterval", {
               type: monitor.type,
-              interval: monitor.interval,
+              interval: monitor.interval / 60, // 转换为分钟
             })}
           </span>
         </div>
@@ -67,22 +62,6 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
 
           <div className="mt-2 flex flex-col gap-2 text-sm text-slate-600">
             <div className="flex items-center justify-between">
-              <span>{t("monitor.uptimeLast7")}</span>
-              <strong>
-                {monitor.uptimeRatio.last7Days !== null
-                  ? `${formatNumber(monitor.uptimeRatio.last7Days)}%`
-                  : "—"}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{t("monitor.uptimeLast30")}</span>
-              <strong>
-                {monitor.uptimeRatio.last30Days !== null
-                  ? `${formatNumber(monitor.uptimeRatio.last30Days)}%`
-                  : "—"}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between">
               <span>{t("monitor.uptimeLast90")}</span>
               <strong>
                 {monitor.uptimeRatio.last90Days !== null
@@ -91,21 +70,27 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
               </strong>
             </div>
             <div className="flex items-center justify-between">
-              <span>{t("monitor.uptimeAllTime")}</span>
+              <span>{t("monitor.downDurationLast90")}</span>
               <strong>
-                {monitor.uptimeRatio.allTime !== null
-                  ? `${formatNumber(monitor.uptimeRatio.allTime)}%`
+                {monitor.downDuration.last90Days !== null
+                  ? `${formatNumber(monitor.downDuration.last90Days)}s`
                   : "—"}
               </strong>
             </div>
           </div>
 
           <p className="text-sm text-slate-500">
-            {monitor.incidents.total > 0
-              ? t("monitor.incidents", {
-                  count: monitor.incidents.total,
-                  duration: formatDuration(monitor.incidents.totalDowntimeSeconds),
-                })
+            {monitor.incidents.total > 0 || (monitor.downDuration.last90Days && monitor.downDuration.last90Days > 0)
+              ? (monitor.incidents.downCount > 0 || monitor.incidents.pauseCount > 0
+                  ? t("monitor.incidentsDetail", {
+                      downCount: monitor.incidents.downCount,
+                      pauseCount: monitor.incidents.pauseCount,
+                      duration: formatDuration(monitor.incidents.totalDowntimeSeconds),
+                    })
+                  : t("monitor.incidents", {
+                      count: monitor.incidents.total,
+                      duration: formatDuration(monitor.incidents.totalDowntimeSeconds),
+                    }))
               : t("monitor.incidentsNone")}
           </p>
         </div>
@@ -113,7 +98,17 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
         <div className="flex flex-col justify-between">
           {hasResponseData ? (
             <ResponseTimeChart
-              data={[...monitor.responseTimes].slice(-40)}
+              data={(() => {
+                // 获取最近3小时的数据
+                const now = dayjs();
+                const threeHoursAgo = now.subtract(3, 'hour');
+                const recentData = monitor.responseTimes.filter(item => 
+                  dayjs(item.at).isAfter(threeHoursAgo)
+                );
+                // 如果最近3小时没有数据，则显示最近的40条数据
+                // 这样可以确保图表始终有数据显示
+                return recentData.length > 0 ? recentData : [...monitor.responseTimes].slice(-40);
+              })()}
               label={t("monitor.responseChartTitle")}
             />
           ) : (

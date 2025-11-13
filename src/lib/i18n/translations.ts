@@ -15,14 +15,13 @@ const baseTranslations = {
     },
     monitor: {
       typeInterval: "{{type}} / {{interval}} 分钟",
-      uptimeLast7: "近 7 天可用率",
-      uptimeLast30: "近 30 天可用率",
       uptimeLast90: "近 90 天可用率",
-      uptimeAllTime: "全时段可用率",
+      downDurationLast90: "近 90 天宕机时长",
       avgResponse: "平均响应",
       latestResponse: "最新响应",
       incidents: "最近 90 天故障 {{count}} 次 · 累计 {{duration}}",
       incidentsNone: "最近 90 天无故障记录",
+      incidentsDetail: "最近 90 天宕机 {{downCount}} 次，暂停 {{pauseCount}} 次 · 累计 {{duration}}",
       status: {
         up: "正常访问",
         down: "异常中",
@@ -60,14 +59,13 @@ const baseTranslations = {
     },
     monitor: {
       typeInterval: "{{type}} / every {{interval}} minutes",
-      uptimeLast7: "7-day uptime",
-      uptimeLast30: "30-day uptime",
       uptimeLast90: "90-day uptime",
-      uptimeAllTime: "All-time uptime",
+      downDurationLast90: "90-day downtime",
       avgResponse: "Average response",
       latestResponse: "Latest response",
       incidents: "Past 90 days: {{count}} incidents · {{duration}} downtime",
       incidentsNone: "No incidents in the past 90 days",
+      incidentsDetail: "Past 90 days: {{downCount}} downtimes, {{pauseCount}} pauses · {{duration}} total downtime",
       status: {
         up: "Operational",
         down: "Disrupted",
