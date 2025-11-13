@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## 项目简介
 
-## Getting Started
+基于 Next.js + Tailwind CSS 打造的自定义站点状态面板，使用 UptimeRobot Read-only API 同步监控数据，支持：
 
-First, run the development server:
+- 以卡片形式展示各监控项的状态、响应时间、可用率；
+- 近期响应时间曲线（Recharts 实现）；
+- 最近 90 天故障统计；
+- 语言切换（中文 / English）；
+- 自动刷新倒计时，可配置刷新间隔；
+- 可选展示监控目标链接（通过环境变量控制）。
+
+## 快速开始
+
+1. 复制环境变量模板并填写：
+
+```bash
+cp env.sample .env.local
+```
+
+必填项：`UPTIMEROBOT_API_KEY`（在 UptimeRobot 仪表盘获取 Read-only API Key）。
+
+可选项：
+
+- `NEXT_PUBLIC_REFRESH_INTERVAL_SECONDS`：前端自动刷新间隔（秒），默认 300；
+- `NEXT_PUBLIC_SHOW_MONITOR_LINKS`：是否展示跳转到监控目标的链接，默认 `true`。
+
+2. 安装依赖：
+
+```bash
+npm install
+```
+
+3. 启动开发环境：
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 [http://localhost:3000](http://localhost:3000) 预览。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 生产部署（Vercel）
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. 在 Vercel 新建项目并选择本仓库；
+2. 在 `Project Settings -> Environment Variables` 中配置上述环境变量；
+3. 常规部署即可，默认使用 `npm run build`；
+4. 如果需要禁用监控链接展示，可将 `NEXT_PUBLIC_SHOW_MONITOR_LINKS` 设置为 `false`。
 
-## Learn More
+## 目录结构
 
-To learn more about Next.js, take a look at the following resources:
+- `src/lib/uptimerobot.ts`：封装 API 请求与数据归一化；
+- `src/components/*`：UI 组件与语言切换；
+- `src/app/page.tsx`：页面入口，加载数据并渲染仪表盘。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 注意事项
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 当前请求策略为 60 秒刷新一次（Next.js `revalidate`），前端倒计时默认 300 秒；
+- 若 UptimeRobot API 调用失败，页面会展示错误提示并保留已有数据；
+- 需要更多 UptimeRobot 字段时可在 `fetchMonitors` 中继续扩展。
