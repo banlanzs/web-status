@@ -120,28 +120,21 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   const responseTimes =
     monitor.response_times
       ?.map((item) => {
-        // 尝试解析日期，支持多种格式
+        // 解析日期，支持数字（秒或毫秒）以及字符串
         let parsedDate: dayjs.Dayjs;
         const datetime = item.datetime;
-        
-        // 如果是数字，可能是Unix时间戳（秒或毫秒）
+
         if (typeof datetime === "number" || /^\d+$/.test(String(datetime))) {
-          const timestamp = Number(datetime);
-          // 如果小于13位数字，认为是秒级时间戳，需要乘以1000
-          // 使用 dayjs(timestamp * 1000) 而不是 dayjs.unix() 以兼容性更好
-          parsedDate = timestamp < 1e12 
-            ? dayjs(timestamp * 1000) 
-            : dayjs(timestamp);
+          const ts = Number(datetime);
+          // 如果是秒级时间戳（小于1e12），使用 dayjs.unix
+          parsedDate = ts < 1e12 ? dayjs.unix(ts) : dayjs(ts);
         } else {
-          // 尝试作为字符串解析
           parsedDate = dayjs(datetime);
         }
-        
+
         // 如果日期无效或早于90天前，返回null
-        if (!parsedDate.isValid() || parsedDate.isBefore(cutoff90Days)) {
-          return null;
-        }
-        
+        if (!parsedDate.isValid() || parsedDate.isBefore(cutoff90Days)) return null;
+
         return {
           at: parsedDate.toISOString(),
           value: item.value,
@@ -151,8 +144,18 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       .sort((a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf()) ?? [];
 
   const lastResponseTime = responseTimes.at(-1)?.value ?? null;
-  const lastCheckedAt =
-    responseTimes.at(-1)?.at ?? monitor.response_times?.at(-1)?.datetime ?? null;
+
+  // 确保 lastCheckedAt 为 ISO 字符串或 null
+  let lastCheckedAt: string | null = null;
+  if (responseTimes.at(-1)?.at) {
+    lastCheckedAt = responseTimes.at(-1)!.at;
+  } else if (monitor.response_times?.at(-1)?.datetime) {
+    const raw = monitor.response_times.at(-1)!.datetime;
+    const parsed = typeof raw === "number" || /^\d+$/.test(String(raw))
+      ? (Number(raw) < 1e12 ? dayjs.unix(Number(raw)) : dayjs(Number(raw)))
+      : dayjs(raw);
+    lastCheckedAt = parsed.isValid() ? parsed.toISOString() : null;
+  }
 
   // 计算平均响应时间（如果API没有返回）
   let averageResponseTime: number | null = null;
@@ -251,6 +254,29 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     throw new Error(
       data.error?.message ?? "UptimeRobot API 返回错误，请检查 API Key。",
     );
+  }
+
+  // 服务器端调试日志：打印原始 API 响应的监控摘要
+  try {
+    // 只打印必要字段，避免控制台被大量数据淹没
+    console.groupCollapsed("[server debug] uptimerobot raw monitors summary");
+    console.log(
+      (data.monitors ?? []).map((m) => ({
+        id: m.id,
+        friendly_name: m.friendly_name,
+        response_times_len: m.response_times?.length ?? 0,
+        has_logs: (m.logs?.length ?? 0) > 0,
+      })),
+    );
+    // 打印第一个监控的原始 response_times（最多 20 条）用于样例检查
+    if (data.monitors && data.monitors.length > 0) {
+      console.log("sample response_times of monitor[0]:", (data.monitors[0].response_times ?? []).slice(-20));
+    }
+    console.groupEnd();
+  } catch (e) {
+    // 无侵入式失败处理
+    // eslint-disable-next-line no-console
+    console.error("[server debug] failed to log raw monitors", e);
   }
 
   return (data.monitors ?? []).map(normalizeMonitor);
