@@ -18,6 +18,7 @@ export interface UptimeRobotMonitor {
   interval: number;
   average_response_time?: number;
   custom_uptime_ratio?: string;
+  all_time_uptime_ratio?: number;
   response_times?: UptimeRobotResponseTime[];
   logs?: UptimeRobotLog[];
 }
@@ -49,6 +50,7 @@ export interface NormalizedMonitor {
     last7Days: number | null;
     last30Days: number | null;
     last90Days: number | null;
+    allTime: number | null;
   };
   responseTimes: {
     at: string;

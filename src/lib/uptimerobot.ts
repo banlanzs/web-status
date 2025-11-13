@@ -90,18 +90,83 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
 }
 
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
+  // 添加调试日志以查看处理前的原始数据
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Processing monitor:", monitor.friendly_name, "all_time_uptime_ratio:", monitor.all_time_uptime_ratio);
+  }
+  
   // v2 API 使用 snake_case 字段名
+  // 处理响应时间数据，修复日期解析问题
+  const now = dayjs();
+  const cutoff90Days = now.subtract(90, "day");
+  
   const responseTimes =
-    monitor.response_times?.map((item) => ({
-      at: dayjs(item.datetime).toISOString(),
-      value: item.value,
-    })) ?? [];
+    monitor.response_times
+      ?.map((item) => {
+        // 尝试解析日期，支持多种格式
+        let parsedDate: dayjs.Dayjs;
+        const datetime = item.datetime;
+        
+        // 如果是数字，可能是Unix时间戳（秒或毫秒）
+        if (typeof datetime === "number" || /^\d+$/.test(String(datetime))) {
+          const timestamp = Number(datetime);
+          // 如果小于13位数字，认为是秒级时间戳，需要乘以1000
+          // 使用 dayjs(timestamp * 1000) 而不是 dayjs.unix() 以兼容性更好
+          parsedDate = timestamp < 1e12 
+            ? dayjs(timestamp * 1000) 
+            : dayjs(timestamp);
+        } else {
+          // 尝试作为字符串解析
+          parsedDate = dayjs(datetime);
+        }
+        
+        // 如果日期无效或早于90天前，返回null
+        if (!parsedDate.isValid() || parsedDate.isBefore(cutoff90Days)) {
+          return null;
+        }
+        
+        return {
+          at: parsedDate.toISOString(),
+          value: item.value,
+        };
+      })
+      .filter((item): item is { at: string; value: number } => item !== null)
+      .sort((a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf()) ?? [];
 
   const lastResponseTime = responseTimes.at(-1)?.value ?? null;
   const lastCheckedAt =
     responseTimes.at(-1)?.at ?? monitor.response_times?.at(-1)?.datetime ?? null;
 
+  // 计算平均响应时间（如果API没有返回）
+  let averageResponseTime: number | null = null;
+  if (typeof monitor.average_response_time === "number" && Number.isFinite(monitor.average_response_time)) {
+    averageResponseTime = monitor.average_response_time;
+  } else if (responseTimes.length > 0) {
+    // 从响应时间数据计算平均值
+    const sum = responseTimes.reduce((acc, item) => acc + item.value, 0);
+    averageResponseTime = sum / responseTimes.length;
+  }
+
   const { normalized: logs, incidents } = normalizeLogs(monitor.logs);
+
+  // 处理 uptime ratio 数据
+  const uptimeRatio = {
+    last7Days: parseUptime(monitor.custom_uptime_ratio, 0),
+    last30Days: parseUptime(monitor.custom_uptime_ratio, 1),
+    last90Days: parseUptime(monitor.custom_uptime_ratio, 2),
+    allTime:
+      (typeof monitor.all_time_uptime_ratio === "number" ||
+       typeof monitor.all_time_uptime_ratio === "string") &&
+      !isNaN(Number(monitor.all_time_uptime_ratio)) &&
+      isFinite(Number(monitor.all_time_uptime_ratio))
+        ? Number(monitor.all_time_uptime_ratio)
+        : null,
+  };
+
+  // 添加调试日志以查看处理后的数据
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Normalized uptimeRatio for", monitor.friendly_name, ":", uptimeRatio);
+  }
 
   return {
     id: monitor.id,
@@ -111,16 +176,9 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     interval: monitor.interval,
     status: STATUS_MAP[monitor.status] ?? "unknown",
     statusCode: monitor.status,
-    averageResponseTime:
-      typeof monitor.average_response_time === "number"
-        ? monitor.average_response_time
-        : null,
+    averageResponseTime,
     lastResponseTime,
-    uptimeRatio: {
-      last7Days: parseUptime(monitor.custom_uptime_ratio, 0),
-      last30Days: parseUptime(monitor.custom_uptime_ratio, 1),
-      last90Days: parseUptime(monitor.custom_uptime_ratio, 2),
-    },
+    uptimeRatio,
     responseTimes,
     logs,
     incidents,
@@ -145,6 +203,7 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     response_times: "1",
     response_times_limit: String(RESPONSE_TIMES_LIMIT),
     custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
+    all_time_uptime_ratio: "1",
   });
 
   const response = await fetch(API_ENDPOINT, {
@@ -163,10 +222,22 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
 
   const data = (await response.json()) as UptimeRobotApiResponse;
 
+  // 添加调试日志以查看 API 返回的数据
+  if (process.env.NODE_ENV === 'development') {
+    console.log("UptimeRobot API Response:", JSON.stringify(data, null, 2));
+  }
+
   if (data.stat !== "ok") {
     throw new Error(
       data.error?.message ?? "UptimeRobot API 返回错误，请检查 API Key。",
     );
+  }
+
+  // 添加调试日志以查看处理前的原始数据
+  if (process.env.NODE_ENV === 'development' && data.monitors) {
+    data.monitors.forEach((monitor, index) => {
+      console.log(`Monitor ${index} all_time_uptime_ratio:`, monitor.all_time_uptime_ratio);
+    });
   }
 
   return (data.monitors ?? []).map(normalizeMonitor);

@@ -18,6 +18,11 @@ interface MonitorCardProps {
 }
 
 export function MonitorCard({ monitor }: MonitorCardProps) {
+  // 添加调试日志以查看传入组件的数据
+  if (process.env.NODE_ENV === 'development') {
+    console.log("MonitorCard received monitor:", monitor.name, "uptimeRatio:", monitor.uptimeRatio);
+  }
+  
   const { t } = useLanguage();
 
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
@@ -63,15 +68,35 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
           <div className="mt-2 flex flex-col gap-2 text-sm text-slate-600">
             <div className="flex items-center justify-between">
               <span>{t("monitor.uptimeLast7")}</span>
-              <strong>{formatNumber(monitor.uptimeRatio.last7Days)}%</strong>
+              <strong>
+                {monitor.uptimeRatio.last7Days !== null
+                  ? `${formatNumber(monitor.uptimeRatio.last7Days)}%`
+                  : "—"}
+              </strong>
             </div>
             <div className="flex items-center justify-between">
               <span>{t("monitor.uptimeLast30")}</span>
-              <strong>{formatNumber(monitor.uptimeRatio.last30Days)}%</strong>
+              <strong>
+                {monitor.uptimeRatio.last30Days !== null
+                  ? `${formatNumber(monitor.uptimeRatio.last30Days)}%`
+                  : "—"}
+              </strong>
             </div>
             <div className="flex items-center justify-between">
               <span>{t("monitor.uptimeLast90")}</span>
-              <strong>{formatNumber(monitor.uptimeRatio.last90Days)}%</strong>
+              <strong>
+                {monitor.uptimeRatio.last90Days !== null
+                  ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
+                  : "—"}
+              </strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>{t("monitor.uptimeAllTime")}</span>
+              <strong>
+                {monitor.uptimeRatio.allTime !== null
+                  ? `${formatNumber(monitor.uptimeRatio.allTime)}%`
+                  : "—"}
+              </strong>
             </div>
           </div>
 
