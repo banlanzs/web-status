@@ -11,3 +11,17 @@ body {
 html {
   min-height: 100%;
 }
+
+/* 波浪动画 */
+@keyframes wave {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.wave-animation {
+  animation: wave 20s linear infinite;
+}

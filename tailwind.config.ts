@@ -29,7 +29,9 @@ const config: Config = {
       },
       backgroundImage: {
         "hero-gradient":
-          "linear-gradient(135deg, rgba(74,222,128,0.95), rgba(45,212,191,0.9))",
+          "linear-gradient(135deg, rgba(16,185,129,0.95), rgba(20,184,166,0.95))",
+        "hero-gradient-warning":
+          "linear-gradient(135deg, rgba(251,191,36,0.95), rgba(245,158,11,0.95))",
       },
       boxShadow: {
         soft: "0 20px 45px -20px rgba(15, 118, 110, 0.35)",

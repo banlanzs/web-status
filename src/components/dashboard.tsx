@@ -4,8 +4,10 @@ import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MonitorCard } from "@/components/monitor-card";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
@@ -86,37 +88,103 @@ export function Dashboard({
     [fetchedAt],
   );
 
+  // 判断是否有问题（有down状态的监控）
+  const hasIssues = summary.down > 0;
+  const bgGradientStyle = hasIssues
+    ? "linear-gradient(135deg, rgba(251,191,36,0.95), rgba(245,158,11,0.95))"
+    : "linear-gradient(135deg, rgba(16,185,129,0.95), rgba(20,184,166,0.95))";
+
+  // 动态更新favicon和页面标题
+  useEffect(() => {
+    const updateFavicon = (color: string) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // 绘制圆形背景
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(16, 16, 14, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // 更新或创建favicon链接
+      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "shortcut icon";
+        document.getElementsByTagName("head")[0].appendChild(link);
+      }
+      link.type = "image/png";
+      link.href = canvas.toDataURL();
+    };
+
+    updateFavicon(hasIssues ? "#fbbf24" : "#10b981");
+    
+    // 更新页面标题，添加状态指示
+    const statusEmoji = hasIssues ? "⚠️" : "✅";
+    document.title = `${statusEmoji} ${t("app.name")}`;
+  }, [hasIssues, t]);
+
   return (
     <div className="min-h-screen bg-slate-100">
-      <section className="relative overflow-hidden bg-hero-gradient pb-32 pt-16 text-white">
-        <div className="absolute inset-0 opacity-20">
-          <svg
-            className="h-full w-full"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 800 400"
-            preserveAspectRatio="none"
-            fill="none"
-          >
-            <path
-              d="M0 200 Q200 100 400 200 T800 200 V400 H0 Z"
-              fill="url(#waveGradient)"
-              opacity="0.6"
-            />
-            <defs>
-              <linearGradient id="waveGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop stopColor="#fff" stopOpacity="0.7" offset="0%" />
-                <stop stopColor="#fff" stopOpacity="0" offset="100%" />
-              </linearGradient>
-            </defs>
-          </svg>
+      <section
+        className="relative overflow-hidden pb-32 pt-16 text-white transition-colors duration-500"
+        style={{ background: bgGradientStyle }}
+      >
+        {/* 动态波浪效果 */}
+        <div className="absolute inset-0 opacity-20 overflow-hidden">
+          <div className="wave-animation" style={{ width: "200%", height: "100%", display: "flex" }}>
+            <svg
+              className="h-full"
+              style={{ width: "50%", flexShrink: 0 }}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 800 400"
+              preserveAspectRatio="none"
+              fill="none"
+            >
+              <path
+                d="M0 200 Q200 100 400 200 T800 200 V400 H0 Z"
+                fill="url(#waveGradient1)"
+                opacity="0.6"
+              />
+              <defs>
+                <linearGradient id="waveGradient1" x1="0" x2="0" y1="0" y2="1">
+                  <stop stopColor="#fff" stopOpacity="0.7" offset="0%" />
+                  <stop stopColor="#fff" stopOpacity="0" offset="100%" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <svg
+              className="h-full"
+              style={{ width: "50%", flexShrink: 0 }}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 800 400"
+              preserveAspectRatio="none"
+              fill="none"
+            >
+              <path
+                d="M0 200 Q200 100 400 200 T800 200 V400 H0 Z"
+                fill="url(#waveGradient2)"
+                opacity="0.6"
+              />
+              <defs>
+                <linearGradient id="waveGradient2" x1="0" x2="0" y1="0" y2="1">
+                  <stop stopColor="#fff" stopOpacity="0.7" offset="0%" />
+                  <stop stopColor="#fff" stopOpacity="0" offset="100%" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
         </div>
         <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-6">
           <header className="flex items-center justify-between">
             <div>
-              <p className="text-sm uppercase tracking-widest text-white/70">
+              <p className="text-sm uppercase tracking-widest text-white/90 drop-shadow-sm">
                 {t("app.name")}
               </p>
-              <h1 className="mt-2 text-3xl font-bold md:text-4xl">
+              <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl drop-shadow-md">
                 {summaryTagline}
               </h1>
             </div>
@@ -136,6 +204,26 @@ export function Dashboard({
                   {isPending ? t("controls.refreshing") : t("controls.refresh")}
                 </button>
               ) : null}
+              <a
+                href={process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/banlanzs/web-status"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30"
+                aria-label="GitHub"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </a>
               <LanguageSwitcher />
             </div>
           </header>
@@ -179,6 +267,8 @@ export function Dashboard({
           )}
         </div>
       </main>
+      <Footer />
+      <ScrollToTop />
     </div>
   );
 }
