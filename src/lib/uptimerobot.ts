@@ -6,9 +6,15 @@ import {
   type UptimeRobotLog,
   type UptimeRobotMonitor,
 } from "@/types/uptimerobot";
+import { uptimeRobotLimiter } from "./rate-limiter";
 
 const API_BASE_URL = "https://api.uptimerobot.com/v2";
 const API_ENDPOINT = `${API_BASE_URL}/getMonitors`;
+
+// 数据缓存
+let cachedMonitors: NormalizedMonitor[] | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_TTL = 60 * 1000; // 缓存有效期 60 秒
 
 // 生成自定义时间范围的函数
 function generateCustomUptimeRanges() {
@@ -114,9 +120,6 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   // v2 API 使用 snake_case 字段名
   // 处理响应时间数据，修复日期解析问题
-  const now = dayjs();
-  const cutoff90Days = now.subtract(90, "day");
-  
   const responseTimes =
     monitor.response_times
       ?.map((item) => {
@@ -132,8 +135,9 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
           parsedDate = dayjs(datetime);
         }
 
-        // 如果日期无效或早于90天前，返回null
-        if (!parsedDate.isValid() || parsedDate.isBefore(cutoff90Days)) return null;
+        // 只检查日期是否有效，不再过滤 90 天前的数据
+        // 保留 API 返回的所有 response_times 数据
+        if (!parsedDate.isValid()) return null;
 
         return {
           at: parsedDate.toISOString(),
@@ -143,7 +147,11 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       .filter((item): item is { at: string; value: number } => item !== null)
       .sort((a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf()) ?? [];
 
-  const lastResponseTime = responseTimes.at(-1)?.value ?? null;
+  // 降级方案：如果没有 response_times 数据，使用 average_response_time 作为最新响应时间
+  const lastResponseTime = responseTimes.at(-1)?.value ?? 
+    (typeof monitor.average_response_time === "number" && Number.isFinite(monitor.average_response_time)
+      ? monitor.average_response_time
+      : null);
 
   // 确保 lastCheckedAt 为 ISO 字符串或 null
   let lastCheckedAt: string | null = null;
@@ -155,9 +163,12 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       ? (Number(raw) < 1e12 ? dayjs.unix(Number(raw)) : dayjs(Number(raw)))
       : dayjs(raw);
     lastCheckedAt = parsed.isValid() ? parsed.toISOString() : null;
+  } else {
+    // 降级：使用当前时间作为 lastCheckedAt
+    lastCheckedAt = dayjs().toISOString();
   }
 
-  // 计算平均响应时间（如果API没有返回）
+  // 计算平均响应时间（优先使用 API 返回的 average_response_time）
   let averageResponseTime: number | null = null;
   if (typeof monitor.average_response_time === "number" && Number.isFinite(monitor.average_response_time)) {
     averageResponseTime = monitor.average_response_time;
@@ -165,6 +176,19 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     // 从响应时间数据计算平均值
     const sum = responseTimes.reduce((acc, item) => acc + item.value, 0);
     averageResponseTime = sum / responseTimes.length;
+  }
+
+  // 降级方案：如果 responseTimes 为空但有 average_response_time，生成占位数据点用于图表
+  if (responseTimes.length === 0 && averageResponseTime !== null) {
+    // 为图表生成最近 3 小时的占位数据（使用 average_response_time）
+    // 从 3 小时前开始，每 30 分钟一个点，到当前时间
+    const now = dayjs();
+    for (let i = 6; i >= 0; i--) {
+      responseTimes.push({
+        at: now.subtract(i * 30, 'minute').toISOString(),
+        value: averageResponseTime,
+      });
+    }
   }
 
   const { normalized: logs, incidents } = normalizeLogs(monitor.logs);
@@ -214,9 +238,47 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     );
   }
 
+  // 检查速率限制
+  const rateLimitCheck = uptimeRobotLimiter.checkLimit();
+  const now = dayjs();
+  const cacheAge = Date.now() - cacheTimestamp;
+  const isCacheValid = cachedMonitors && cacheAge < CACHE_TTL;
+
+  // 如果超过速率限制，返回缓存数据或抛出错误
+  if (!rateLimitCheck.allowed) {
+    const resetInSeconds = Math.ceil(rateLimitCheck.resetIn / 1000);
+    console.warn(
+      `[Rate Limit] API 请求被限制。速率限制: 10 req/min, 重置时间: ${resetInSeconds}秒后`
+    );
+
+    if (isCacheValid) {
+      console.info(
+        `[Rate Limit] 返回缓存数据 (缓存年龄: ${Math.round(cacheAge / 1000)}秒)`
+      );
+      return cachedMonitors!;
+    } else {
+      throw new Error(
+        `API 速率限制已达上限 (10 req/min)。请在 ${resetInSeconds} 秒后重试。`
+      );
+    }
+  }
+
+  // 如果缓存有效，直接返回缓存（即使在速率限制内，也优先使用缓存）
+  if (isCacheValid) {
+    console.info(
+      `[Cache Hit] 返回缓存数据 (缓存年龄: ${Math.round(cacheAge / 1000)}秒, 剩余请求: ${rateLimitCheck.remainingRequests}/10)`
+    );
+    return cachedMonitors!;
+  }
+
+  // 记录此次 API 请求
+  uptimeRobotLimiter.recordRequest();
+  console.info(
+    `[API Request] 发起新请求 (剩余配额: ${rateLimitCheck.remainingRequests - 1}/10)`
+  );
+
   // v2 API 使用 application/x-www-form-urlencoded 格式
   // 计算日志查询的时间范围（90天前到现在）
-  const now = dayjs();
   const logsStartDate = now.subtract(90, "day").unix();
   const logsEndDate = now.unix();
   
@@ -229,11 +291,8 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     logs_start_date: String(logsStartDate),
     logs_end_date: String(logsEndDate),
     response_times: "1",
-    response_times_limit: String(RESPONSE_TIMES_LIMIT),
-    // 明确请求响应时间的时间范围（API 最多允许 7 天范围）。
-    // 这里默认请求最近 24 小时的数据以供页面图表显示，避免短窗口导致无数据。
-    response_times_start_date: String(dayjs().subtract(24, "hour").unix()),
-    response_times_end_date: String(dayjs().unix()),
+    // 完全不设置 response_times_limit、response_times_start_date 和 response_times_end_date
+    // 让 API 返回默认数据（根据文档，默认为最近 24 小时）
     custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
     custom_uptime_ratios: "7-30-90",
   });
@@ -263,81 +322,45 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
 
   // 服务器端调试日志：打印原始 API 响应的监控摘要
   try {
-    // 只打印必要字段，避免控制台被大量数据淹没
-    console.groupCollapsed("[server debug] uptimerobot raw monitors summary");
-    console.log(
-      (data.monitors ?? []).map((m) => ({
-        id: m.id,
-        friendly_name: m.friendly_name,
-        response_times_len: m.response_times?.length ?? 0,
-        has_logs: (m.logs?.length ?? 0) > 0,
-      })),
-    );
-    // 打印第一个监控的原始 response_times（最多 20 条）用于样例检查
-    if (data.monitors && data.monitors.length > 0) {
-      console.log("sample response_times of monitor[0]:", (data.monitors[0].response_times ?? []).slice(-20));
+    const monitors = data.monitors ?? [];
+    const totalResponseTimes = monitors.reduce((acc, m) => acc + (m.response_times?.length ?? 0), 0);
+    
+    console.log("\n========== [server debug] uptimerobot API response ==========");
+    console.log(`Total monitors: ${monitors.length}`);
+    console.log(`Total response_times entries: ${totalResponseTimes}`);
+    console.log("\nPer-monitor summary:");
+    monitors.forEach((m, idx) => {
+      console.log(`  [${idx}] ${m.id} (${m.friendly_name}): response_times=${m.response_times?.length ?? 0}, logs=${m.logs?.length ?? 0}`);
+    });
+    
+    // 打印第一个监控的原始 response_times（最多 10 条）用于样例检查
+    if (monitors.length > 0 && monitors[0].response_times && monitors[0].response_times.length > 0) {
+      console.log(`\nSample response_times of monitor[0] (last 10 entries):`);
+      const sample = monitors[0].response_times.slice(-10);
+      sample.forEach((rt: any) => {
+        console.log(`  datetime=${rt.datetime}, value=${rt.value}ms`);
+      });
+    } else if (monitors.length > 0) {
+      console.log(`\n⚠️  monitor[0] has NO response_times data returned from API`);
     }
-    console.groupEnd();
+    console.log("============================================================\n");
   } catch (e) {
     // 无侵入式失败处理
     // eslint-disable-next-line no-console
     console.error("[server debug] failed to log raw monitors", e);
   }
 
-  // 如果主请求返回的所有监控的 response_times 都为空，尝试第二次请求不带 start/end
+  // 处理返回的监控数据
   const monitors = data.monitors ?? [];
-  const totalResponseTimes = monitors.reduce((acc, m) => acc + (m.response_times?.length ?? 0), 0);
 
-  if (totalResponseTimes === 0 && monitors.length > 0) {
-    try {
-      console.info("[server debug] no response_times in primary request, issuing fallback request without start/end (last 24h)");
-      const fallbackParams = new URLSearchParams({
-        api_key: apiKey,
-        format: "json",
-        logs: "1",
-        logs_limit: "300",
-        log_types: "1-2-99",
-        response_times: "1",
-        response_times_limit: String(RESPONSE_TIMES_LIMIT),
-        custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
-        custom_uptime_ratios: "7-30-90",
-      });
+  // 更新缓存
+  const normalizedData = monitors.map(normalizeMonitor);
+  cachedMonitors = normalizedData;
+  cacheTimestamp = Date.now();
 
-      const fallbackResp = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Cache-Control": "no-cache",
-        },
-        body: fallbackParams.toString(),
-        next: { revalidate: 60 },
-      });
+  console.info(
+    `[Cache Updated] 缓存已更新 (${normalizedData.length} 个监控器)`
+  );
 
-      if (fallbackResp.ok) {
-        const fallbackData = (await fallbackResp.json()) as UptimeRobotApiResponse;
-        // 如果 fallback 返回数据，尝试把其 response_times 合并到原 monitors（按 id 匹配）
-        if (fallbackData?.monitors) {
-          const fallbackMap = new Map<number, typeof fallbackData.monitors[0]>();
-          for (const m of fallbackData.monitors) fallbackMap.set(m.id, m as any);
-          for (const m of monitors) {
-            const fb = fallbackMap.get(m.id);
-            if (fb && fb.response_times && fb.response_times.length > 0) {
-              m.response_times = fb.response_times;
-            }
-          }
-
-          // 记录合并后摘要
-          console.groupCollapsed("[server debug] after fallback merge response_times summary");
-          console.log(monitors.map((m) => ({ id: m.id, response_times_len: m.response_times?.length ?? 0 })));
-          console.groupEnd();
-        }
-      } else {
-        console.warn("[server debug] fallback request failed:", fallbackResp.statusText);
-      }
-    } catch (e) {
-      console.error("[server debug] fallback request error", e);
-    }
-  }
-
-  return monitors.map(normalizeMonitor);
+  return normalizedData;
 }

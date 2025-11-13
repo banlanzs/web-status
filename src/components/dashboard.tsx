@@ -198,10 +198,25 @@ export function Dashboard({
                       setSecondsLeft(refreshInterval);
                     })
                   }
-                  className="rounded-full bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30"
+                  className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30 disabled:opacity-50"
                   disabled={isPending}
+                  aria-label={isPending ? t("controls.refreshing") : t("controls.refresh")}
+                  title={isPending ? t("controls.refreshing") : t("controls.refresh")}
                 >
-                  {isPending ? t("controls.refreshing") : t("controls.refresh")}
+                  <svg
+                    className={`h-5 w-5 ${isPending ? "animate-spin" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
                 </button>
               ) : null}
               <a
@@ -228,17 +243,17 @@ export function Dashboard({
             </div>
           </header>
 
-          <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
+          <div className="grid grid-cols-1 gap-3 text-sm text-white/80 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:gap-4">
             <StatusBadge status={overallStatus} label={summaryTagline} />
-            <span className="rounded-full bg-white/10 px-3 py-1">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-center">
               {t("app.lastUpdated", { time: formattedUpdatedAt })}
             </span>
             {refreshInterval > 0 ? (
-              <span className="rounded-full bg-white/10 px-3 py-1">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-center">
                 {t("app.nextRefresh", { seconds: secondsLeft })}
               </span>
             ) : null}
-            <span className="rounded-full bg-white/10 px-3 py-1">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-center">
               {t("app.monitorsSummary", {
                 total: summary.total,
                 up: summary.up,

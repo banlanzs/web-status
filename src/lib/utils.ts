@@ -16,22 +16,28 @@ export function formatDuration(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) {
     return "0s";
   }
-  const units: [number, Intl.RelativeTimeFormatUnit][] = [
-    [60 * 60 * 24, "day"],
-    [60 * 60, "hour"],
-    [60, "minute"],
-    [1, "second"],
-  ];
+  
+  const totalSeconds = Math.floor(seconds);
+  const days = Math.floor(totalSeconds / (60 * 60 * 24));
+  const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
+  const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+  const secs = totalSeconds % 60;
+  
   const parts: string[] = [];
-  let remaining = Math.floor(seconds);
-  for (const [unitSeconds, label] of units) {
-    if (remaining >= unitSeconds) {
-      const value = Math.floor(remaining / unitSeconds);
-      parts.push(`${value}${label.charAt(0)}`);
-      remaining %= unitSeconds;
-    }
-    if (parts.length === 2) break;
+  
+  if (days > 0) {
+    parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+  } else if (hours > 0) {
+    parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+  } else if (minutes > 0) {
+    parts.push(`${minutes}m`);
+    if (secs > 0) parts.push(`${secs}s`);
+  } else {
+    parts.push(`${secs}s`);
   }
+  
   return parts.join(" ");
 }
 

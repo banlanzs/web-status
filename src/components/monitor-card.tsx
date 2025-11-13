@@ -73,7 +73,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
               <span>{t("monitor.downDurationLast90")}</span>
               <strong>
                 {monitor.downDuration.last90Days !== null
-                  ? `${formatNumber(monitor.downDuration.last90Days)}s`
+                  ? formatDuration(monitor.downDuration.last90Days)
                   : "—"}
               </strong>
             </div>
