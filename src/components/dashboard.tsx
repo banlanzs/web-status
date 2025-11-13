@@ -243,17 +243,19 @@ export function Dashboard({
             </div>
           </header>
 
-          <div className="grid grid-cols-1 gap-3 text-sm text-white/80 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:gap-4">
-            <StatusBadge status={overallStatus} label={summaryTagline} />
-            <span className="rounded-full bg-white/10 px-3 py-1 text-center">
+          <div className="grid grid-cols-1 gap-3 text-xs sm:text-sm text-white/80 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:gap-4">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <StatusBadge status={overallStatus} label={summaryTagline} />
+            </div>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-center truncate">
               {t("app.lastUpdated", { time: formattedUpdatedAt })}
             </span>
             {refreshInterval > 0 ? (
-              <span className="rounded-full bg-white/10 px-3 py-1 text-center">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-center whitespace-nowrap">
                 {t("app.nextRefresh", { seconds: secondsLeft })}
               </span>
             ) : null}
-            <span className="rounded-full bg-white/10 px-3 py-1 text-center">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-center whitespace-nowrap">
               {t("app.monitorsSummary", {
                 total: summary.total,
                 up: summary.up,
