@@ -226,7 +226,9 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     downDuration,
     responseTimes,
     logs,
+    logs24h: [],
     incidents,
+    incidents24h: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
     lastCheckedAt,
   };
 }

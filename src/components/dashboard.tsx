@@ -347,17 +347,24 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       ? ((daySeconds - downDuration) / daySeconds) * 100
       : 100;
     
-    // 确定颜色：优先根据日志判断，没有日志且在监控范围内则默认为正常
+    // 确定颜色：历史故障显示黄色，当前故障显示红色
     let color = "bg-emerald-500"; // 默认正常
     let status = "normal";
     
-    if (hasDownLog) {
-      color = "bg-rose-500"; // 故障
-      status = "down";
-    } else if (dateStr > today) {
+    if (dateStr > today) {
       // 未来日期显示为灰色
       color = "bg-slate-300";
       status = "future";
+    } else if (hasDownLog) {
+      // 如果是今天且当前监控状态是down，显示红色
+      if (dateStr === today && monitor.status === "down") {
+        color = "bg-rose-500"; // 当前故障 - 红色
+        status = "down";
+      } else {
+        // 历史故障或已恢复的故障 - 黄色
+        color = "bg-amber-500";
+        status = "warning";
+      }
     }
     // 如果没有故障日志，即使没有响应数据也默认显示为绿色（正常）
     
