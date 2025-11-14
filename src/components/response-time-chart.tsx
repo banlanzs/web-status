@@ -21,6 +21,18 @@ interface ResponseTimeChartProps {
 }
 
 export function ResponseTimeChart({ data, label }: ResponseTimeChartProps) {
+  // 如果数据为空，显示占位符
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-32 w-full">
+        <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/40 text-sm text-emerald-600">
+          暂无响应时间数据
+        </div>
+        <p className="mt-2 text-xs text-slate-500">{label}</p>
+      </div>
+    );
+  }
+
   const formatted = data.map((item) => ({
     ...item,
     atLabel: dayjs(item.at).format("MM-DD HH:mm"),

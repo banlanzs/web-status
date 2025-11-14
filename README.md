@@ -88,6 +88,60 @@ export const uptimeRobotLimiter = new RateLimiter({
 const CACHE_TTL = 60 * 1000; // 缓存有效期（毫秒）
 ```
 
+## 响应时间数据显示
+
+本项目支持**混合数据源**获取响应时间数据：
+
+### 🎯 双重数据源
+1. **主数据源**：UptimeRobot API（默认）
+   - 从 UptimeRobot 获取最多 2000 条历史数据
+   - 利用其成熟的监控基础设施
+
+2. **备用数据源**：自定义监控（可选启用）
+   - 当 API 无数据时，直接检测目标 URL
+   - 类似 UptimeFlare 的实现方式
+   - 实时获取响应时间，确保数据完整性
+
+### ⚙️ 启用自定义监控增强
+
+在 `.env.local` 中添加：
+```env
+NEXT_PUBLIC_USE_CUSTOM_MONITOR=true
+```
+
+这样当 UptimeRobot API 不返回响应时间数据时，系统会自动切换到直接检测目标 URL 的方式。
+
+### 📊 核心特性
+- 📊 **最多获取 2000 条**历史数据点（UptimeRobot API）
+- 🔄 **智能降级**：API 无数据时自动切换到自定义监控
+- 📈 **主页概览**：显示最近 3 小时的响应时间趋势
+- 📉 **详情页面**：完整的历史响应时间图表
+- ⚡ **实时检测**：自定义监控直接测量目标 URL 响应时间
+- 🐛 **调试工具**：内置测试脚本验证数据
+
+### 🧪 测试工具
+```bash
+# 测试 UptimeRobot API 数据
+node scripts/test-response-times.js
+
+# 测试自定义监控 API
+curl -X POST http://localhost:3000/api/custom-monitor \
+  -H "Content-Type: application/json" \
+  -d '{"monitors":[{"id":1,"url":"https://example.com"}]}'
+```
+
+### 📚 相关文档
+- 🔥 **[混合数据源指南](HYBRID_DATA_SOURCE.md)** - 自定义监控详细说明
+- 📖 [快速测试指南](QUICK_TEST.md) - 立即验证功能是否正常
+- 🔍 [调试指南](DEBUG_RESPONSE_TIMES.md) - 详细的故障排查步骤
+- 📝 [改进报告](RESPONSE_TIME_IMPROVEMENTS.md) - 完整的技术实现说明
+
+### ⚠️ 注意事项
+- UptimeRobot 免费账户可能有数据保留限制
+- 启用自定义监控会从你的服务器向目标 URL 发送请求
+- 建议合理设置刷新间隔（300秒或更长）以避免频繁请求
+- Vercel 免费计划有函数执行时间限制（10秒），大量监控建议升级
+
 ## 注意事项
 
 - 当前请求策略为 60 秒刷新一次（Next.js `revalidate`），前端倒计时默认 300 秒；

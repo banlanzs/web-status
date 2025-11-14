@@ -3,13 +3,15 @@
 import dayjs from "dayjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
+import { useMonitors } from "@/components/providers/monitors-provider";
+import { LoadingOverlay } from "@/components/loading";
 import { formatNumber, formatDuration } from "@/lib/utils";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 
@@ -25,65 +27,53 @@ interface DashboardProps {
 }
 
 export function Dashboard({
-  monitors,
+  monitors: initialMonitors,
   fetchedAt,
   refreshInterval = DEFAULT_REFRESH_SECONDS,
-  errorMessage,
+  errorMessage: initialError,
 }: DashboardProps) {
   const { t } = useLanguage();
   const router = useRouter();
+  const { monitors, isLoading, error, refresh, lastUpdated } = useMonitors();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
-  const [isPending, startTransition] = useTransition();
-  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
+
+  // 使用 Provider 的数据，如果 Provider 没有数据则使用初始数据
+  const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
+  const displayError = error || initialError;
 
   useEffect(() => {
     setSecondsLeft(refreshInterval);
-  }, [refreshInterval, fetchedAt]);
+  }, [refreshInterval, lastUpdated]);
 
   useEffect(() => {
     if (refreshInterval <= 0) return;
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          startTransition(() => {
-            router.refresh();
-          });
+          refresh(); // 使用 Provider 的 refresh 方法
           return refreshInterval;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [refreshInterval, router]);
+  }, [refreshInterval, refresh]);
 
-  // 手动刷新函数，强制更新数据
+  // 手动刷新函数
   const handleForceRefresh = async () => {
-    setIsForceRefreshing(true);
-    try {
-      // 触发页面刷新并强制更新数据
-      startTransition(() => {
-        // 添加查询参数来标记强制刷新
-        const url = new URL(window.location.href);
-        url.searchParams.set('force', Date.now().toString());
-        router.push(url.toString());
-        router.refresh();
-      });
-      // 重置倒计时
-      setSecondsLeft(refreshInterval);
-    } finally {
-      setIsForceRefreshing(false);
-    }
+    await refresh();
+    setSecondsLeft(refreshInterval);
   };
 
   const summary = useMemo(() => {
-    const total = monitors.length;
-    const up = monitors.filter((monitor) => monitor.status === "up").length;
-    const down = monitors.filter((monitor) => monitor.status === "down").length;
-    const paused = monitors.filter(
+    const total = displayMonitors.length;
+    const up = displayMonitors.filter((monitor) => monitor.status === "up").length;
+    const down = displayMonitors.filter((monitor) => monitor.status === "down").length;
+    const paused = displayMonitors.filter(
       (monitor) => monitor.status === "paused",
     ).length;
     return { total, up, down, paused };
-  }, [monitors]);
+  }, [displayMonitors]);
 
   const summaryTagline = useMemo(() => {
     if (summary.total === 0) return t("app.taglineUnknown");
@@ -105,8 +95,8 @@ export function Dashboard({
             : "up";
 
   const formattedUpdatedAt = useMemo(
-    () => dayjs(fetchedAt).format("YYYY-MM-DD HH:mm:ss"),
-    [fetchedAt],
+    () => dayjs(lastUpdated || fetchedAt).format("YYYY-MM-DD HH:mm:ss"),
+    [lastUpdated, fetchedAt],
   );
 
   // 判断是否有问题（有down状态的监控）
@@ -215,12 +205,12 @@ export function Dashboard({
                   type="button"
                   onClick={handleForceRefresh}
                   className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30 disabled:opacity-50"
-                  disabled={isPending || isForceRefreshing}
-                  aria-label={isForceRefreshing ? t("controls.refreshing") : t("controls.refresh")}
-                  title={isForceRefreshing ? t("controls.refreshing") : t("controls.refresh")}
+                  disabled={isLoading}
+                  aria-label={isLoading ? t("controls.refreshing") : t("controls.refresh")}
+                  title={isLoading ? t("controls.refreshing") : t("controls.refresh")}
                 >
                   <svg
-                    className={`h-5 w-5 ${isForceRefreshing ? "animate-spin" : ""}`}
+                    className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
@@ -282,15 +272,17 @@ export function Dashboard({
         </div>
       </section>
 
+      <LoadingOverlay show={isLoading} />
+
       <main className="mt-8 space-y-6 pb-24">
         <div className="mx-auto w-full max-w-5xl space-y-6 px-6">
-          {errorMessage !== undefined && errorMessage !== null ? (
+          {displayError ? (
             <div className="rounded-3xl border border-danger/40 bg-danger/10 p-6 text-danger-foreground shadow-soft">
-              {errorMessage || t("errors.failed")}
+              {displayError || t("errors.failed")}
             </div>
           ) : null}
 
-          {monitors.length === 0 ? (
+          {displayMonitors.length === 0 ? (
             <div className="rounded-3xl bg-white/70 p-12 text-center text-slate-500 shadow-soft">
               {t("app.empty")}
             </div>
@@ -300,7 +292,7 @@ export function Dashboard({
                 Services
               </h2>
               <div className="space-y-3">
-                {monitors.map((monitor) => (
+                {displayMonitors.map((monitor) => (
                   <MonitorListItem key={monitor.id} monitor={monitor} />
                 ))}
               </div>

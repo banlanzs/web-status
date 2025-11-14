@@ -1,21 +1,44 @@
-import { notFound } from "next/navigation";
+"use client";
 
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { MonitorDetail } from "@/components/monitor-detail";
-import { fetchMonitors } from "@/lib/uptimerobot";
+import { useMonitors } from "@/components/providers/monitors-provider";
+import { SkeletonCard } from "@/components/loading";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 
-interface MonitorPageProps {
-  params: Promise<{ id: string }>;
-}
+export default function MonitorPage() {
+  const params = useParams();
+  const id = params?.id as string;
+  const { monitors, isLoading } = useMonitors();
+  const [monitor, setMonitor] = useState<NormalizedMonitor | null>(null);
 
-export default async function MonitorPage({ params }: MonitorPageProps) {
-  const { id } = await params;
-  // 在详情页强制刷新数据，确保显示最新信息
-  const monitors: NormalizedMonitor[] = await fetchMonitors(true);
-  const monitor = monitors.find((m) => String(m.id) === id);
+  useEffect(() => {
+    if (monitors.length > 0) {
+      const found = monitors.find((m) => String(m.id) === id);
+      setMonitor(found || null);
+    }
+  }, [monitors, id]);
 
-  if (!monitor) {
-    notFound();
+  if (isLoading || !monitor) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-5xl">
+          <SkeletonCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (!monitor && monitors.length > 0) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-5xl text-center">
+          <h1 className="text-2xl font-bold text-slate-900">监控器未找到</h1>
+          <p className="mt-2 text-slate-600">ID: {id}</p>
+        </div>
+      </div>
+    );
   }
 
   return <MonitorDetail monitor={monitor} />;
