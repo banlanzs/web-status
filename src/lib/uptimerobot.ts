@@ -84,6 +84,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
           typeof log.duration === "number" && Number.isFinite(log.duration)
             ? log.duration
             : null,
+        reason: log.reason, // 直接保留 reason 字段
       };
     })
     .filter((log) => log.parsedDate.isValid() && log.parsedDate.isAfter(cutoff))
@@ -112,7 +113,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
     type: log.type,
     datetime: log.datetime,
     duration: log.duration,
-    reason: (log as any).reason,
+    reason: log.reason, // 使用已经保留的 reason 字段
   }));
 
   return { normalized: cleanedNormalized, incidents: { total, totalDowntimeSeconds, downCount, pauseCount } };
@@ -196,6 +197,22 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
 
   // 处理 uptime ratio 数据
   const uptimeRatio = {
+    // 7天数据是第一个（索引为0）时间段
+    last7Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length === 0) return null;
+        const value = parseFloat(segments[0] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
+    // 30天数据是第二个（索引为1）时间段
+    last30Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length <= 1) return null;
+        const value = parseFloat(segments[1] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
     // 90天数据是第三个（索引为2）时间段
     last90Days: monitor.custom_uptime_ratio ? 
       (() => {
@@ -208,6 +225,8 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
 
   // 处理宕机时长数据 - 从 incidents 中获取，而不是从 API
   const downDuration = {
+    last7Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
+    last30Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
     // 使用从日志计算出的总宕机时长
     last90Days: incidents.totalDowntimeSeconds > 0 ? incidents.totalDowntimeSeconds : null,
   };
