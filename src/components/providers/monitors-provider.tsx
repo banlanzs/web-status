@@ -28,11 +28,10 @@ export function useMonitors() {
 
 interface MonitorsProviderProps {
   children: ReactNode;
-  initialMonitors: NormalizedMonitor[];
 }
 
-export function MonitorsProvider({ children, initialMonitors }: MonitorsProviderProps) {
-  // 先检查缓存，如果有缓存就用缓存，否则用初始数据
+export function MonitorsProvider({ children }: MonitorsProviderProps) {
+  // 先检查缓存，如果有缓存就用缓存
   const [monitors, setMonitors] = useState<NormalizedMonitor[]>(() => {
     if (typeof window !== "undefined") {
       const cached = getCachedMonitors();
@@ -41,23 +40,56 @@ export function MonitorsProvider({ children, initialMonitors }: MonitorsProvider
         return cached;
       }
     }
-    console.log("[Monitors Provider] 初始化: 使用服务器端数据");
-    return initialMonitors;
+    return [];
   });
   
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // 首次挂载时保存初始数据到缓存（仅当缓存不存在时）
+  // 首次挂载时自动加载数据
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const loadInitialData = async () => {
+      // 如果已经有缓存数据，先显示缓存，然后在后台刷新
       const cached = getCachedMonitors();
-      if (!cached || cached.length === 0) {
-        setCachedMonitors(initialMonitors);
-        console.log("[Monitors Provider] 保存初始数据到缓存");
+      if (cached && cached.length > 0) {
+        setMonitors(cached);
+        setIsLoading(false);
+        console.log("[Monitors Provider] 使用缓存数据，后台刷新中...");
       }
-    }
+
+      // 加载最新数据
+      try {
+        const response = await fetch("/api/monitors", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error(`API 错误: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.monitors && Array.isArray(data.monitors)) {
+          setMonitors(data.monitors);
+          setCachedMonitors(data.monitors);
+          setLastUpdated(new Date());
+          console.log("[Monitors Provider] 数据加载完成");
+        }
+      } catch (err: any) {
+        console.error("[Monitors Provider] 加载失败:", err);
+        setError(err.message || "数据加载失败");
+        
+        // 如果没有缓存且加载失败，保持 loading 状态但显示错误
+        if (!cached || cached.length === 0) {
+          setMonitors([]);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   const refresh = useCallback(async () => {
