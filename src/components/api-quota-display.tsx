@@ -7,30 +7,66 @@ interface ApiQuotaInfo {
   total: number;
   cacheAge?: number;
   isFromCache?: boolean;
+  isLimited?: boolean;
+  resetIn?: number;
 }
 
 export function ApiQuotaDisplay() {
   const [quotaInfo, setQuotaInfo] = useState<ApiQuotaInfo | null>(null);
 
   useEffect(() => {
-    // 从页面加载时的服务器响应中提取配额信息
-    // 这是一个简单的演示实现，实际可以通过 API route 获取实时数据
-    
-    // 模拟：从 localStorage 读取上次的配额信息
-    const checkQuota = () => {
+    // 获取实时配额信息
+    const fetchQuotaInfo = async () => {
       try {
-        const stored = localStorage.getItem("api_quota_info");
-        if (stored) {
-          const info = JSON.parse(stored) as ApiQuotaInfo;
-          setQuotaInfo(info);
+        // 首先检查是否有速率限制信息
+        const rateLimitStored = localStorage.getItem("rate_limit_info");
+        if (rateLimitStored) {
+          const rateLimitInfo = JSON.parse(rateLimitStored);
+          const age = Date.now() - (rateLimitInfo.timestamp || 0);
+          
+          // 如果速率限制信息有效（60秒内）
+          if (age <= 60000 && rateLimitInfo.isLimited) {
+            // 设置配额信息为0，表示已达到限制
+            setQuotaInfo({
+              remaining: 0,
+              total: 10,
+              isFromCache: true,
+              cacheAge: age,
+              isLimited: true,
+              resetIn: rateLimitInfo.resetIn
+            });
+            return;
+          }
+        }
+        
+        // 获取实时配额信息
+        const response = await fetch("/api/quota");
+        if (response.ok) {
+          const data = await response.json();
+          setQuotaInfo({
+            remaining: data.remaining,
+            total: data.total,
+            isLimited: data.isLimited,
+            resetIn: data.resetIn
+          });
         }
       } catch (e) {
-        console.error("Failed to parse quota info", e);
+        console.error("Failed to fetch quota info", e);
+        // 如果获取实时信息失败，尝试从localStorage获取
+        try {
+          const stored = localStorage.getItem("api_quota_info");
+          if (stored) {
+            const info = JSON.parse(stored) as ApiQuotaInfo;
+            setQuotaInfo(info);
+          }
+        } catch (e2) {
+          console.error("Failed to parse quota info", e2);
+        }
       }
     };
 
-    checkQuota();
-    const interval = setInterval(checkQuota, 10000); // 每 10 秒更新一次
+    fetchQuotaInfo();
+    const interval = setInterval(fetchQuotaInfo, 10000); // 每 10 秒更新一次
 
     return () => clearInterval(interval);
   }, []);
@@ -87,6 +123,12 @@ export function ApiQuotaDisplay() {
       {isWarning && (
         <div className="mt-2 text-xs text-red-600 dark:text-red-400">
           ⚠️ 配额即将用尽，请稍后再刷新
+        </div>
+      )}
+      
+      {quotaInfo.isLimited && quotaInfo.resetIn && (
+        <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+          ⚠️ 已达到速率限制，将在 {Math.ceil(quotaInfo.resetIn / 1000)} 秒后重置
         </div>
       )}
     </div>

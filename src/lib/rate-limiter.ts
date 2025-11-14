@@ -40,16 +40,16 @@ class RateLimiter {
 
   /**
    * 尝试执行请求，如果超过限制则返回缓存数据
-   * @param cachedData 缓存的数据
-   * @returns { allowed: boolean, remainingRequests: number }
+   * @returns { allowed: boolean, remainingRequests: number, isLimited: boolean }
    */
-  checkLimit(): { allowed: boolean; remainingRequests: number; resetIn: number } {
+  checkLimit(): { allowed: boolean; remainingRequests: number; resetIn: number; isLimited: boolean } {
     const now = Date.now();
     const windowStart = now - this.config.windowMs;
 
     // 清除时间窗口外的旧请求记录
     this.requests = this.requests.filter(timestamp => timestamp > windowStart);
 
+    const isLimited = this.requests.length >= this.config.maxRequests;
     const allowed = this.requests.length < this.config.maxRequests;
     const remainingRequests = Math.max(0, this.config.maxRequests - this.requests.length);
     
@@ -58,7 +58,7 @@ class RateLimiter {
       ? Math.max(0, this.requests[0] + this.config.windowMs - now)
       : 0;
 
-    return { allowed, remainingRequests, resetIn };
+    return { allowed, remainingRequests, resetIn, isLimited };
   }
 
   /**

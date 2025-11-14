@@ -266,19 +266,34 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
   const cacheAge = Date.now() - cacheTimestamp;
   const isCacheValid = cachedMonitors && cacheAge < CACHE_TTL;
 
-  // 如果超过速率限制，返回缓存数据或抛出错误
-  if (!rateLimitCheck.allowed) {
+  // 如果超过速率限制，返回缓存数据并提示用户
+  if (rateLimitCheck.isLimited) {
     const resetInSeconds = Math.ceil(rateLimitCheck.resetIn / 1000);
     console.warn(
       `[Rate Limit] API 请求被限制。速率限制: 10 req/min, 重置时间: ${resetInSeconds}秒后`
     );
 
+    // 设置速率限制信息到 localStorage，供前端显示
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem("rate_limit_info", JSON.stringify({
+          isLimited: true,
+          message: `API 速率限制已达上限 (10 req/min)。请在 ${resetInSeconds} 秒后重试。`,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        // 忽略存储错误
+      }
+    }
+
     if (isCacheValid) {
       console.info(
         `[Rate Limit] 返回缓存数据 (缓存年龄: ${Math.round(cacheAge / 1000)}秒)`
       );
+      // 即使是假刷新，也返回缓存数据
       return cachedMonitors!;
     } else {
+      // 如果没有有效缓存，抛出错误
       throw new Error(
         `API 速率限制已达上限 (10 req/min)。请在 ${resetInSeconds} 秒后重试。`
       );
@@ -299,7 +314,6 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     `[API Request] 发起新请求 (剩余配额: ${rateLimitCheck.remainingRequests - 1}/10)`
   );
 
-  // v2 API 使用 application/x-www-form-urlencoded 格式
   // 计算日志查询的时间范围（90天前到现在）
   const logsStartDate = now.subtract(90, "day").unix();
   const logsEndDate = now.unix();
@@ -313,8 +327,8 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     logs_start_date: String(logsStartDate),
     logs_end_date: String(logsEndDate),
     response_times: "1",
-    // 完全不设置 response_times_limit、response_times_start_date 和 response_times_end_date
-    // 让 API 返回默认数据（根据文档，默认为最近 24 小时）
+    // 使用 response_times_limit 来获取更多响应时间数据，而不是指定时间范围
+    response_times_limit: "1000", // 获取最近1000条响应时间数据
     custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
     custom_uptime_ratios: "7-30-90",
   });
@@ -337,9 +351,9 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
   let data = (await response.json()) as UptimeRobotApiResponse;
 
   if (data.stat !== "ok") {
-    throw new Error(
-      data.error?.message ?? "UptimeRobot API 返回错误，请检查 API Key。",
-    );
+    const errorMessage = data.error?.message ?? "UptimeRobot API 返回错误，请检查 API Key。";
+    console.error(`[API Error] ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   // 服务器端调试日志：打印原始 API 响应的监控摘要
@@ -383,6 +397,15 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
   console.info(
     `[Cache Updated] 缓存已更新 (${normalizedData.length} 个监控器)`
   );
+
+  // 清除速率限制信息
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem("rate_limit_info");
+    } catch (e) {
+      // 忽略存储错误
+    }
+  }
 
   return normalizedData;
 }
