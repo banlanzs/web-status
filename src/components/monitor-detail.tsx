@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
 import Link from "next/link";
+import { useState } from "react";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
@@ -26,6 +27,34 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
   const { t } = useLanguage();
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
   const hasResponseData = monitor.responseTimes.length > 0;
+  
+  // 日志分页状态
+  const [visibleLogsCount, setVisibleLogsCount] = useState(5);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  
+  // 每次加载更多日志的数量
+  const LOGS_PER_PAGE = 10;
+  
+  // 获取排序后的日志
+  const sortedLogs = [...monitor.logs].sort((a, b) => {
+    return dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
+  });
+  
+  // 当前显示的日志
+  const visibleLogs = sortedLogs.slice(0, visibleLogsCount);
+  
+  // 是否还有更多日志可以加载
+  const hasMoreLogs = visibleLogsCount < sortedLogs.length;
+  
+  // 加载更多日志的函数
+  const loadMoreLogs = () => {
+    setIsLoadingLogs(true);
+    // 模拟加载延迟，让用户看到加载效果
+    setTimeout(() => {
+      setVisibleLogsCount(prev => prev + LOGS_PER_PAGE);
+      setIsLoadingLogs(false);
+    }, 300);
+  };
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -188,59 +217,83 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
           </h2>
           {monitor.logs.length > 0 ? (
             <div className="space-y-3">
-              {monitor.logs
-                .sort((a, b) => {
-                  return dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
-                })
-                .map((log, index) => {
-                  const logTime = dayjs(log.datetime);
-                  const getLogTypeLabel = (type: number) => {
-                    switch (type) {
-                      case 1:
-                        return { label: "宕机 (Down)", color: "text-rose-600 bg-rose-50 border-rose-200" };
-                      case 2:
-                        return { label: "恢复 (Up)", color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
-                      case 99:
-                        return { label: "暂停 (Paused)", color: "text-amber-600 bg-amber-50 border-amber-200" };
-                      case 98:
-                        return { label: "启动 (Started)", color: "text-blue-600 bg-blue-50 border-blue-200" };
-                      default:
-                        return { label: `类型 ${type}`, color: "text-slate-600 bg-slate-50 border-slate-200" };
-                    }
-                  };
-                  const typeInfo = getLogTypeLabel(log.type);
-                  
-                  return (
-                    <div
-                      key={index}
-                      className="rounded-lg border bg-white p-4 text-sm shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`rounded-lg border px-3 py-1 text-xs font-medium ${typeInfo.color}`}
-                          >
-                            {typeInfo.label}
-                          </span>
-                          <span className="font-mono text-slate-700">
-                            {logTime.format("YYYY-MM-DD HH:mm:ss")}
-                          </span>
-                        </div>
-                        {log.duration !== null && log.duration > 0 && (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-                            持续: {formatDuration(log.duration)}
-                          </span>
-                        )}
+              {visibleLogs.map((log, index) => {
+                const logTime = dayjs(log.datetime);
+                const getLogTypeLabel = (type: number) => {
+                  switch (type) {
+                    case 1:
+                      return { label: "宕机 (Down)", color: "text-rose-600 bg-rose-50 border-rose-200" };
+                    case 2:
+                      return { label: "恢复 (Up)", color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+                    case 99:
+                      return { label: "暂停 (Paused)", color: "text-amber-600 bg-amber-50 border-amber-200" };
+                    case 98:
+                      return { label: "启动 (Started)", color: "text-blue-600 bg-blue-50 border-blue-200" };
+                    default:
+                      return { label: `类型 ${type}`, color: "text-slate-600 bg-slate-50 border-slate-200" };
+                  }
+                };
+                const typeInfo = getLogTypeLabel(log.type);
+                
+                return (
+                  <div
+                    key={index}
+                    className="rounded-lg border bg-white p-4 text-sm shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`rounded-lg border px-3 py-1 text-xs font-medium ${typeInfo.color}`}
+                        >
+                          {typeInfo.label}
+                        </span>
+                        <span className="font-mono text-slate-700">
+                          {logTime.format("YYYY-MM-DD HH:mm:ss")}
+                        </span>
                       </div>
-                      {log.reason && (log.reason.code || log.reason.detail) && (
-                        <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                          <span className="font-semibold text-slate-700">原因: </span>
-                          {log.reason.detail || log.reason.code}
-                        </div>
+                      {log.duration !== null && log.duration > 0 && (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                          持续: {formatDuration(log.duration)}
+                        </span>
                       )}
                     </div>
-                  );
-                })}
+                    {log.reason && (log.reason.code || log.reason.detail) && (
+                      <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        <span className="font-semibold text-slate-700">原因: </span>
+                        {log.reason.detail || log.reason.code}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {/* 加载更多按钮 */}
+              {hasMoreLogs && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={loadMoreLogs}
+                    disabled={isLoadingLogs}
+                    className="flex items-center gap-2 rounded-lg bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-200 disabled:opacity-70"
+                  >
+                    {isLoadingLogs ? (
+                      <>
+                        <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        加载中...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                        加载更多日志
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 p-8 text-center text-sm text-slate-500">
