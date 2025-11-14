@@ -32,6 +32,10 @@ export interface UptimeRobotLog {
   type: number;
   datetime: string;
   duration?: number;
+  reason?: {
+    code?: string;
+    detail?: string;
+  };
 }
 
 export type MonitorStatus = "up" | "down" | "paused" | "unknown";
@@ -64,11 +68,19 @@ export interface NormalizedMonitor {
     type: number;
     datetime: string;
     duration: number | null;
+    reason?: {
+      code?: string;
+      detail?: string;
+    };
   }[];
   logs24h: {
     type: number;
     datetime: string;
     duration: number | null;
+    reason?: {
+      code?: string;
+      detail?: string;
+    };
   }[];
   incidents: {
     total: number;

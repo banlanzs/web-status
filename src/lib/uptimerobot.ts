@@ -108,10 +108,11 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
   });
 
   // 移除 parsedDate 字段，只返回需要的数据
-  const cleanedNormalized = normalized.map(({ type, datetime, duration }) => ({
-    type,
-    datetime,
-    duration,
+  const cleanedNormalized = normalized.map((log) => ({
+    type: log.type,
+    datetime: log.datetime,
+    duration: log.duration,
+    reason: (log as any).reason,
   }));
 
   return { normalized: cleanedNormalized, incidents: { total, totalDowntimeSeconds, downCount, pauseCount } };

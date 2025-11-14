@@ -1,7 +1,12 @@
 "use client";
 
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/zh-cn";
 import Link from "next/link";
+
+dayjs.extend(relativeTime);
+dayjs.locale("zh-cn");
 
 import { ResponseTimeChart } from "@/components/response-time-chart";
 import { StatusBadge } from "@/components/status-badge";
@@ -169,6 +174,80 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
               </div>
             )}
           </div>
+        </section>
+
+        {/* 最近事件日志 */}
+        <section className="rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
+          <h2 className="mb-4 text-lg font-semibold text-slate-800">
+            事件日志
+            {monitor.logs.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-slate-500">
+                （最近 {monitor.logs.length} 条）
+              </span>
+            )}
+          </h2>
+          {monitor.logs.length > 0 ? (
+            <div className="space-y-3">
+              {monitor.logs
+                .sort((a, b) => {
+                  return dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
+                })
+                .map((log, index) => {
+                  const logTime = dayjs(log.datetime);
+                  const getLogTypeLabel = (type: number) => {
+                    switch (type) {
+                      case 1:
+                        return { label: "宕机 (Down)", color: "text-rose-600 bg-rose-50 border-rose-200" };
+                      case 2:
+                        return { label: "恢复 (Up)", color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+                      case 99:
+                        return { label: "暂停 (Paused)", color: "text-amber-600 bg-amber-50 border-amber-200" };
+                      case 98:
+                        return { label: "启动 (Started)", color: "text-blue-600 bg-blue-50 border-blue-200" };
+                      default:
+                        return { label: `类型 ${type}`, color: "text-slate-600 bg-slate-50 border-slate-200" };
+                    }
+                  };
+                  const typeInfo = getLogTypeLabel(log.type);
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-lg border bg-white p-4 text-sm shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`rounded-lg border px-3 py-1 text-xs font-medium ${typeInfo.color}`}
+                          >
+                            {typeInfo.label}
+                          </span>
+                          <span className="font-mono text-slate-700">
+                            {logTime.format("YYYY-MM-DD HH:mm:ss")}
+                          </span>
+                        </div>
+                        {log.duration !== null && log.duration > 0 && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                            持续: {formatDuration(log.duration)}
+                          </span>
+                        )}
+                      </div>
+                      {log.reason && (log.reason.code || log.reason.detail) && (
+                        <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                          <span className="font-semibold text-slate-700">原因: </span>
+                          {log.reason.detail || log.reason.code}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 p-8 text-center text-sm text-slate-500">
+              <div className="mb-2">📋 暂无日志数据</div>
+              <div className="text-xs">监控尚未产生任何事件记录</div>
+            </div>
+          )}
         </section>
       </div>
     </div>
