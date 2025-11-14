@@ -34,6 +34,7 @@ export function Dashboard({
   const router = useRouter();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
   const [isPending, startTransition] = useTransition();
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
 
   useEffect(() => {
     setSecondsLeft(refreshInterval);
@@ -54,6 +55,25 @@ export function Dashboard({
     }, 1000);
     return () => clearInterval(timer);
   }, [refreshInterval, router]);
+
+  // 手动刷新函数，强制更新数据
+  const handleForceRefresh = async () => {
+    setIsForceRefreshing(true);
+    try {
+      // 触发页面刷新并强制更新数据
+      startTransition(() => {
+        // 添加查询参数来标记强制刷新
+        const url = new URL(window.location.href);
+        url.searchParams.set('force', Date.now().toString());
+        router.push(url.toString());
+        router.refresh();
+      });
+      // 重置倒计时
+      setSecondsLeft(refreshInterval);
+    } finally {
+      setIsForceRefreshing(false);
+    }
+  };
 
   const summary = useMemo(() => {
     const total = monitors.length;
@@ -193,19 +213,14 @@ export function Dashboard({
               {refreshInterval > 0 ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    startTransition(() => {
-                      router.refresh();
-                      setSecondsLeft(refreshInterval);
-                    })
-                  }
+                  onClick={handleForceRefresh}
                   className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30 disabled:opacity-50"
-                  disabled={isPending}
-                  aria-label={isPending ? t("controls.refreshing") : t("controls.refresh")}
-                  title={isPending ? t("controls.refreshing") : t("controls.refresh")}
+                  disabled={isPending || isForceRefreshing}
+                  aria-label={isForceRefreshing ? t("controls.refreshing") : t("controls.refresh")}
+                  title={isForceRefreshing ? t("controls.refreshing") : t("controls.refresh")}
                 >
                   <svg
-                    className={`h-5 w-5 ${isPending ? "animate-spin" : ""}`}
+                    className={`h-5 w-5 ${isForceRefreshing ? "animate-spin" : ""}`}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"

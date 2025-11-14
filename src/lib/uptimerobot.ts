@@ -16,6 +16,9 @@ let cachedMonitors: NormalizedMonitor[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 60 * 1000; // 缓存有效期 60 秒
 
+// 强制刷新标记
+let forceRefresh = false;
+
 // 生成自定义时间范围的函数
 function generateCustomUptimeRanges() {
   // 生成三个时间段的数据，与 custom_uptime_ratios 参数匹配
@@ -252,12 +255,17 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   };
 }
 
-export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
+export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMonitor[]> {
   const apiKey = process.env.UPTIMEROBOT_API_KEY;
   if (!apiKey) {
     throw new Error(
       "未配置 UPTIMEROBOT_API_KEY 环境变量，请在 Vercel 或本地 .env 中设置。",
     );
+  }
+
+  // 检查是否需要强制刷新
+  if (forceUpdate) {
+    forceRefresh = true;
   }
 
   // 检查速率限制
@@ -266,8 +274,8 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
   const cacheAge = Date.now() - cacheTimestamp;
   const isCacheValid = cachedMonitors && cacheAge < CACHE_TTL;
 
-  // 如果超过速率限制，返回缓存数据并提示用户
-  if (rateLimitCheck.isLimited) {
+  // 如果超过速率限制且不是强制刷新，返回缓存数据并提示用户
+  if (rateLimitCheck.isLimited && !forceRefresh) {
     const resetInSeconds = Math.ceil(rateLimitCheck.resetIn / 1000);
     console.warn(
       `[Rate Limit] API 请求被限制。速率限制: 10 req/min, 重置时间: ${resetInSeconds}秒后`
@@ -300,13 +308,16 @@ export async function fetchMonitors(): Promise<NormalizedMonitor[]> {
     }
   }
 
-  // 如果缓存有效，直接返回缓存（即使在速率限制内，也优先使用缓存）
-  if (isCacheValid) {
+  // 如果缓存有效且不是强制刷新，直接返回缓存
+  if (isCacheValid && !forceRefresh) {
     console.info(
       `[Cache Hit] 返回缓存数据 (缓存年龄: ${Math.round(cacheAge / 1000)}秒, 剩余请求: ${rateLimitCheck.remainingRequests}/10)`
     );
     return cachedMonitors!;
   }
+
+  // 清除强制刷新标记
+  forceRefresh = false;
 
   // 记录此次 API 请求
   uptimeRobotLimiter.recordRequest();

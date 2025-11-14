@@ -10,7 +10,8 @@ interface MonitorPageProps {
 
 export default async function MonitorPage({ params }: MonitorPageProps) {
   const { id } = await params;
-  const monitors: NormalizedMonitor[] = await fetchMonitors();
+  // 在详情页强制刷新数据，确保显示最新信息
+  const monitors: NormalizedMonitor[] = await fetchMonitors(true);
   const monitor = monitors.find((m) => String(m.id) === id);
 
   if (!monitor) {
