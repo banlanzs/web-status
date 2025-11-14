@@ -48,8 +48,6 @@ export interface NormalizedMonitor {
   interval: number;
   status: MonitorStatus;
   statusCode: number;
-  averageResponseTime: number | null;
-  lastResponseTime: number | null;
   uptimeRatio: {
     last7Days: number | null;
     last30Days: number | null;
@@ -60,10 +58,6 @@ export interface NormalizedMonitor {
     last30Days: number | null;
     last90Days: number | null;
   };
-  responseTimes: {
-    at: string;
-    value: number;
-  }[];
   logs: {
     type: number;
     datetime: string;

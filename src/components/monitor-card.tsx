@@ -3,7 +3,6 @@
 import dayjs from "dayjs";
 import Link from "next/link";
 
-import { ResponseTimeChart } from "@/components/response-time-chart";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
 import { cn, formatNumber, formatDuration } from "@/lib/utils";
@@ -21,8 +20,6 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
   const { t } = useLanguage();
 
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
-
-  const hasResponseData = monitor.responseTimes.length > 0;
 
   return (
     <section className="flex flex-col gap-4 rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100 backdrop-blur">
@@ -43,24 +40,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between text-sm text-slate-600">
-            <span>{t("monitor.latestResponse")}</span>
-            <strong className="text-emerald-600">
-              {monitor.lastResponseTime
-                ? `${monitor.lastResponseTime} ms`
-                : "—"}
-            </strong>
-          </div>
-          <div className="flex items-center justify-between text-sm text-slate-600">
-            <span>{t("monitor.avgResponse")}</span>
-            <strong className="text-emerald-600">
-              {monitor.averageResponseTime
-                ? `${formatNumber(monitor.averageResponseTime)} ms`
-                : "—"}
-            </strong>
-          </div>
-
-          <div className="mt-2 flex flex-col gap-2 text-sm text-slate-600">
+          <div className="flex flex-col gap-2 text-sm text-slate-600">
             <div className="flex items-center justify-between">
               <span>{t("monitor.uptimeLast90")}</span>
               <strong>
@@ -96,27 +76,6 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
         </div>
 
         <div className="flex flex-col justify-between">
-          {hasResponseData ? (
-            <ResponseTimeChart
-              data={(() => {
-                // 获取最近3小时的数据
-                const now = dayjs();
-                const threeHoursAgo = now.subtract(3, 'hour');
-                const recentData = monitor.responseTimes.filter(item => 
-                  dayjs(item.at).isAfter(threeHoursAgo)
-                );
-                // 如果最近3小时没有数据，则显示最近的40条数据
-                // 这样可以确保图表始终有数据显示
-                return recentData.length > 0 ? recentData : [...monitor.responseTimes].slice(-40);
-              })()}
-              label={t("monitor.responseChartTitle")}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/40 text-sm text-emerald-600">
-              {t("monitor.responseChartTitle")}
-            </div>
-          )}
-
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
             <span>
               {monitor.lastCheckedAt

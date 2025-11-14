@@ -6,11 +6,15 @@ export const dynamic = "force-dynamic";
 
 /**
  * API 端点：获取监控数据
- * GET /api/monitors
+ * GET /api/monitors?force=timestamp (可选：强制刷新)
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const monitors = await fetchMonitors(false); // 不强制刷新，使用服务器端缓存
+    // 检查是否有 force 参数来强制刷新
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.has('force');
+    
+    const monitors = await fetchMonitors(forceRefresh);
 
     return NextResponse.json({
       success: true,

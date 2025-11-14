@@ -9,7 +9,6 @@ import { useState } from "react";
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
 
-import { ResponseTimeChart } from "@/components/response-time-chart";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
 import { cn, formatDuration, formatNumber } from "@/lib/utils";
@@ -26,7 +25,6 @@ interface MonitorDetailProps {
 export function MonitorDetail({ monitor }: MonitorDetailProps) {
   const { t } = useLanguage();
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
-  const hasResponseData = monitor.responseTimes.length > 0;
   
   // 日志分页状态
   const [visibleLogsCount, setVisibleLogsCount] = useState(5);
@@ -81,24 +79,9 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
           <StatusBadge status={monitor.status} label={statusLabel} />
         </div>
 
-        <section className="grid gap-6 md:grid-cols-2">
+        <section className="grid gap-6 md:grid-cols-1">
           <div className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <span>{t("monitor.latestResponse")}</span>
-              <strong className="text-emerald-600">
-                {monitor.lastResponseTime ? `${monitor.lastResponseTime} ms` : "—"}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <span>{t("monitor.avgResponse")}</span>
-              <strong className="text-emerald-600">
-                {monitor.averageResponseTime
-                  ? `${formatNumber(monitor.averageResponseTime)} ms`
-                  : "—"}
-              </strong>
-            </div>
-
-            <div className="mt-2 flex flex-col gap-2 text-sm text-slate-600">
+            <div className="flex flex-col gap-2 text-sm text-slate-600">
               <div className="flex items-center justify-between">
                 <span>{t("monitor.uptimeLast90")}</span>
                 <strong>
@@ -180,28 +163,6 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                 </span>
               )}
             </div>
-          </div>
-
-          <div className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
-            {hasResponseData ? (
-              <ResponseTimeChart
-                data={(() => {
-                  const now = dayjs();
-                  const threeHoursAgo = now.subtract(3, "hour");
-                  const recentData = monitor.responseTimes.filter((item) =>
-                    dayjs(item.at).isAfter(threeHoursAgo),
-                  );
-                  return recentData.length > 0
-                    ? recentData
-                    : [...monitor.responseTimes].slice(-40);
-                })()}
-                label={t("monitor.responseChartTitle")}
-              />
-            ) : (
-              <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/40 text-sm text-emerald-600">
-                {t("monitor.responseChartTitle")}
-              </div>
-            )}
           </div>
         </section>
 

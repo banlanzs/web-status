@@ -340,14 +340,6 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       .filter((log) => log.type === 1 || log.type === 99)
       .reduce((sum, log) => sum + (log.duration || 0), 0);
     
-    // 检查该天是否有响应时间数据
-    const dayResponses = monitor.responseTimes.filter((rt) => {
-      const rtDate = dayjs(rt.at).format("YYYY-MM-DD");
-      return rtDate === dateStr;
-    });
-    
-    const hasResponseData = dayResponses.length > 0;
-    
     // 计算当天可用率：一天86400秒，减去宕机时长
     const daySeconds = 86400;
     const uptime = downDuration > 0 
@@ -373,13 +365,12 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
         status = "warning";
       }
     }
-    // 如果没有故障日志，即使没有响应数据也默认显示为绿色（正常）
+    // 如果没有故障日志，默认显示为绿色（正常）
     
     return {
       date: dateStr,
       color,
       status,
-      hasResponseData,
       hasDownLog,
       downDuration,
       uptime,

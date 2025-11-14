@@ -7,7 +7,6 @@ import {
   type UptimeRobotMonitor,
 } from "@/types/uptimerobot";
 import { uptimeRobotLimiter } from "./rate-limiter";
-import { checkMonitor, type CustomMonitorConfig } from "./custom-monitor";
 
 const API_BASE_URL = "https://api.uptimerobot.com/v2";
 const API_ENDPOINT = `${API_BASE_URL}/getMonitors`;
@@ -125,70 +124,10 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
 
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   // v2 API 使用 snake_case 字段名
-  // 处理响应时间数据，移除时间限制，保留所有 API 返回的数据
-  const responseTimes =
-    monitor.response_times
-      ?.map((item) => {
-        // 解析日期，支持数字（秒或毫秒）以及字符串
-        let parsedDate: dayjs.Dayjs;
-        const datetime = item.datetime;
-
-        if (typeof datetime === "number" || /^\d+$/.test(String(datetime))) {
-          const ts = Number(datetime);
-          // 如果是秒级时间戳（小于1e12），使用 dayjs.unix
-          parsedDate = ts < 1e12 ? dayjs.unix(ts) : dayjs(ts);
-        } else {
-          parsedDate = dayjs(datetime);
-        }
-
-        // 只检查日期是否有效，保留所有有效的响应时间数据
-        if (!parsedDate.isValid()) return null;
-
-        return {
-          at: parsedDate.toISOString(),
-          value: item.value,
-        };
-      })
-      .filter((item): item is { at: string; value: number } => item !== null)
-      .sort((a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf()) ?? [];
-
-  // 降级方案：如果没有 response_times 数据，使用 average_response_time 作为最新响应时间
-  const lastResponseTime = responseTimes.at(-1)?.value ?? 
-    (typeof monitor.average_response_time === "number" && Number.isFinite(monitor.average_response_time)
-      ? monitor.average_response_time
-      : null);
-
-  // 确保 lastCheckedAt 为 ISO 字符串或 null
-  let lastCheckedAt: string | null = null;
-  if (responseTimes.at(-1)?.at) {
-    lastCheckedAt = responseTimes.at(-1)!.at;
-  } else if (monitor.response_times?.at(-1)?.datetime) {
-    const raw = monitor.response_times.at(-1)!.datetime;
-    const parsed = typeof raw === "number" || /^\d+$/.test(String(raw))
-      ? (Number(raw) < 1e12 ? dayjs.unix(Number(raw)) : dayjs(Number(raw)))
-      : dayjs(raw);
-    lastCheckedAt = parsed.isValid() ? parsed.toISOString() : null;
-  } else {
-    // 降级：使用当前时间作为 lastCheckedAt
-    lastCheckedAt = dayjs().toISOString();
-  }
-
-  // 计算平均响应时间（优先使用 API 返回的 average_response_time）
-  let averageResponseTime: number | null = null;
-  if (typeof monitor.average_response_time === "number" && Number.isFinite(monitor.average_response_time)) {
-    averageResponseTime = monitor.average_response_time;
-  } else if (responseTimes.length > 0) {
-    // 从响应时间数据计算平均值
-    const sum = responseTimes.reduce((acc, item) => acc + item.value, 0);
-    averageResponseTime = sum / responseTimes.length;
-  }
-
-  // 如果没有响应时间数据，记录警告但不生成占位数据
-  if (responseTimes.length === 0 && !averageResponseTime) {
-    console.warn(
-      `[Warning] 监控器 ${monitor.id} (${monitor.friendly_name}) 无任何响应时间数据`
-    );
-  }
+  
+  // UptimeRobot API 不提供 "最后检查时间" 字段
+  // 使用当前时间表示数据获取时间
+  const lastCheckedAt = dayjs().toISOString();
 
   const { normalized: logs, incidents } = normalizeLogs(monitor.logs);
 
@@ -236,11 +175,8 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     interval: monitor.interval,
     status: STATUS_MAP[monitor.status] ?? "unknown",
     statusCode: monitor.status,
-    averageResponseTime,
-    lastResponseTime,
     uptimeRatio,
     downDuration,
-    responseTimes,
     logs,
     logs24h: [],
     incidents,
@@ -360,51 +296,9 @@ export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMoni
     throw new Error(errorMessage);
   }
 
-  // 服务器端调试日志：打印原始 API 响应的监控摘要
-  try {
-    const monitors = data.monitors ?? [];
-    const totalResponseTimes = monitors.reduce((acc, m) => acc + (m.response_times?.length ?? 0), 0);
-    
-    console.log("\n========== [server debug] uptimerobot API response ==========");
-    console.log(`Total monitors: ${monitors.length}`);
-    console.log(`Total response_times entries: ${totalResponseTimes}`);
-    console.log("\nPer-monitor summary:");
-    monitors.forEach((m, idx) => {
-      const rtCount = m.response_times?.length ?? 0;
-      const avgRT = m.average_response_time ?? 'N/A';
-      console.log(`  [${idx}] ${m.id} (${m.friendly_name}):`);
-      console.log(`       response_times=${rtCount}, average_response_time=${avgRT}ms, logs=${m.logs?.length ?? 0}`);
-      
-      // 如果有响应时间数据，显示时间范围
-      if (m.response_times && m.response_times.length > 0) {
-        const firstRT = m.response_times[0];
-        const lastRT = m.response_times[m.response_times.length - 1];
-        console.log(`       time_range: ${firstRT.datetime} ~ ${lastRT.datetime}`);
-      }
-    });
-    
-    // 打印第一个监控的原始 response_times（最多 10 条）用于样例检查
-    if (monitors.length > 0 && monitors[0].response_times && monitors[0].response_times.length > 0) {
-      console.log(`\nSample response_times of monitor[0] (last 10 entries):`);
-      const sample = monitors[0].response_times.slice(-10);
-      sample.forEach((rt: any) => {
-        console.log(`  datetime=${rt.datetime}, value=${rt.value}ms`);
-      });
-    } else if (monitors.length > 0) {
-      console.log(`\n⚠️  monitor[0] has NO response_times data returned from API`);
-      if (monitors[0].average_response_time) {
-        console.log(`   但有 average_response_time: ${monitors[0].average_response_time}ms (将使用降级方案)`);
-      }
-    }
-    console.log("============================================================\n");
-  } catch (e) {
-    // 无侵入式失败处理
-    // eslint-disable-next-line no-console
-    console.error("[server debug] failed to log raw monitors", e);
-  }
-
   // 处理返回的监控数据
   const monitors = data.monitors ?? [];
+  console.log(`[API Response] 获取到 ${monitors.length} 个监控器`);
 
   // 更新缓存
   const normalizedData = monitors.map(normalizeMonitor);
@@ -424,130 +318,8 @@ export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMoni
     }
   }
 
-  // 检查是否启用自定义监控增强
-  const useCustomMonitor = process.env.NEXT_PUBLIC_USE_CUSTOM_MONITOR === "true";
+  cachedMonitors = normalizedData;
+  cacheTimestamp = Date.now();
   
-  if (useCustomMonitor) {
-    console.info("[Custom Monitor] 启用自定义监控增强功能");
-    try {
-      const enhancedData = await enhanceWithCustomMonitor(normalizedData);
-      cachedMonitors = enhancedData;
-      return enhancedData;
-    } catch (error) {
-      console.error("[Custom Monitor] 增强失败，使用原始数据:", error);
-      // 失败时返回原始数据（已包含降级逻辑）
-    }
-  }
-
   return normalizedData;
-}
-
-/**
- * 使用自定义监控增强响应时间数据
- * 当 UptimeRobot API 没有返回响应时间数据时，直接检测目标 URL
- */
-async function enhanceWithCustomMonitor(
-  monitors: NormalizedMonitor[]
-): Promise<NormalizedMonitor[]> {
-  const monitorsNeedingEnhancement: CustomMonitorConfig[] = [];
-
-  // 找出需要增强的监控器
-  // 策略：如果 UptimeRobot API 完全没有返回响应时间数据（包括 average_response_time）
-  monitors.forEach((monitor) => {
-    // 检查是否有真实的 UptimeRobot 数据
-    const hasRealApiData = monitor.averageResponseTime !== null && monitor.responseTimes.length > 0;
-    
-    const needsEnhancement = !hasRealApiData;
-
-    if (needsEnhancement && monitor.url) {
-      monitorsNeedingEnhancement.push({
-        id: monitor.id,
-        url: monitor.url,
-        timeout: 30000,
-      });
-    }
-  });
-
-  if (monitorsNeedingEnhancement.length === 0) {
-    console.info("[Custom Monitor] 所有监控器都有足够的响应时间数据，无需增强");
-    return monitors;
-  }
-
-  console.info(
-    `[Custom Monitor] 需要增强 ${monitorsNeedingEnhancement.length} 个监控器的响应时间数据`
-  );
-
-  // 批量检测响应时间
-  const checkPromises = monitorsNeedingEnhancement.map(async (config) => {
-    try {
-      const result = await checkMonitor(config);
-      return { id: config.id, result };
-    } catch (error) {
-      console.error(`[Custom Monitor] 检测失败 (ID: ${config.id}):`, error);
-      return null;
-    }
-  });
-
-  const results = await Promise.allSettled(checkPromises);
-
-  // 将检测结果合并到监控数据中
-  const enhancedMonitors = monitors.map((monitor) => {
-    const needsEnhancement = monitorsNeedingEnhancement.find(
-      (m) => m.id === monitor.id
-    );
-
-    if (!needsEnhancement) {
-      return monitor;
-    }
-
-    // 查找对应的检测结果
-    const resultIndex = monitorsNeedingEnhancement.findIndex(
-      (m) => m.id === monitor.id
-    );
-    const settled = results[resultIndex];
-
-    if (settled.status === "fulfilled" && settled.value) {
-      const { result } = settled.value;
-
-      // 不管成功还是失败，只要有 responseTime 就使用
-      if (result.responseTime) {
-        const statusSymbol = result.success ? "✓" : "✗";
-        console.info(
-          `[Custom Monitor] ${statusSymbol} ID ${monitor.id}: ${result.responseTime}ms ${result.error ? `(${result.error})` : ""}`
-        );
-
-        // 使用检测到的响应时间
-        const newLastResponseTime = result.responseTime;
-        
-        // 添加最新的检测数据点
-        let newResponseTimes = [...monitor.responseTimes];
-        newResponseTimes.push({
-          at: result.timestamp,
-          value: newLastResponseTime,
-        });
-
-        // 重新计算平均响应时间
-        const newAverageResponseTime =
-          newResponseTimes.reduce((sum, item) => sum + item.value, 0) /
-          newResponseTimes.length;
-
-        return {
-          ...monitor,
-          lastResponseTime: newLastResponseTime,
-          averageResponseTime: Math.round(newAverageResponseTime),
-          responseTimes: newResponseTimes,
-          lastCheckedAt: result.timestamp,
-        };
-      } else {
-        console.warn(
-          `[Custom Monitor] ✗ ID ${monitor.id}: 完全失败，无响应时间数据`
-        );
-      }
-    }
-
-    // 如果检测完全失败且已有占位数据，保持不变
-    return monitor;
-  });
-
-  return enhancedMonitors;
 }
