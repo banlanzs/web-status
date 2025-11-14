@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "print:uptimerobot-sample": "node ./scripts/print_uptimerobot_sample.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

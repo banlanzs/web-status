@@ -47,9 +47,13 @@ export interface NormalizedMonitor {
   averageResponseTime: number | null;
   lastResponseTime: number | null;
   uptimeRatio: {
+    last7Days: number | null;
+    last30Days: number | null;
     last90Days: number | null;
   };
   downDuration: {
+    last7Days: number | null;
+    last30Days: number | null;
     last90Days: number | null;
   };
   responseTimes: {
@@ -61,7 +65,18 @@ export interface NormalizedMonitor {
     datetime: string;
     duration: number | null;
   }[];
+  logs24h: {
+    type: number;
+    datetime: string;
+    duration: number | null;
+  }[];
   incidents: {
+    total: number;
+    totalDowntimeSeconds: number;
+    downCount: number;
+    pauseCount: number;
+  };
+  incidents24h: {
     total: number;
     totalDowntimeSeconds: number;
     downCount: number;

@@ -1,15 +1,16 @@
 "use client";
 
 import dayjs from "dayjs";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { MonitorCard } from "@/components/monitor-card";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
+import { formatNumber, formatDuration } from "@/lib/utils";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 
 const DEFAULT_REFRESH_SECONDS = Number(
@@ -266,26 +267,203 @@ export function Dashboard({
         </div>
       </section>
 
-      <main className="-mt-20 space-y-6 pb-24">
+      <main className="mt-8 space-y-6 pb-24">
         <div className="mx-auto w-full max-w-5xl space-y-6 px-6">
           {errorMessage !== undefined && errorMessage !== null ? (
             <div className="rounded-3xl border border-danger/40 bg-danger/10 p-6 text-danger-foreground shadow-soft">
               {errorMessage || t("errors.failed")}
             </div>
           ) : null}
+
           {monitors.length === 0 ? (
             <div className="rounded-3xl bg-white/70 p-12 text-center text-slate-500 shadow-soft">
               {t("app.empty")}
             </div>
           ) : (
-            monitors.map((monitor) => (
-              <MonitorCard key={monitor.id} monitor={monitor} />
-            ))
+            <section className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
+                Services
+              </h2>
+              <div className="space-y-3">
+                {monitors.map((monitor) => (
+                  <MonitorListItem key={monitor.id} monitor={monitor} />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       </main>
       <Footer />
       <ScrollToTop />
+    </div>
+  );
+}
+
+interface MonitorListItemProps {
+  monitor: NormalizedMonitor;
+}
+
+const SHOW_LINKS =
+  process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "false" &&
+  process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "0";
+
+const STATUS_DAYS = Number(
+  process.env.NEXT_PUBLIC_STATUS_DAYS ?? 60,
+);
+
+function MonitorListItem({ monitor }: MonitorListItemProps) {
+  const { t } = useLanguage();
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const segments = STATUS_DAYS;
+
+  // 为每一天构建状态数据
+  const dayData = Array.from({ length: segments }, (_, index) => {
+    const date = dayjs().subtract(segments - 1 - index, "day");
+    const dateStr = date.format("YYYY-MM-DD");
+    const today = dayjs().format("YYYY-MM-DD");
+    
+    // 检查该天是否有故障日志
+    const dayLogs = monitor.logs.filter((log) => {
+      const logDate = dayjs(log.datetime).format("YYYY-MM-DD");
+      return logDate === dateStr;
+    });
+    
+    const hasDownLog = dayLogs.some((log) => log.type === 1 || log.type === 99);
+    const downDuration = dayLogs
+      .filter((log) => log.type === 1 || log.type === 99)
+      .reduce((sum, log) => sum + (log.duration || 0), 0);
+    
+    // 检查该天是否有响应时间数据
+    const dayResponses = monitor.responseTimes.filter((rt) => {
+      const rtDate = dayjs(rt.at).format("YYYY-MM-DD");
+      return rtDate === dateStr;
+    });
+    
+    const hasResponseData = dayResponses.length > 0;
+    
+    // 计算当天可用率：一天86400秒，减去宕机时长
+    const daySeconds = 86400;
+    const uptime = downDuration > 0 
+      ? ((daySeconds - downDuration) / daySeconds) * 100
+      : 100;
+    
+    // 确定颜色：优先根据日志判断，没有日志且在监控范围内则默认为正常
+    let color = "bg-emerald-500"; // 默认正常
+    let status = "normal";
+    
+    if (hasDownLog) {
+      color = "bg-rose-500"; // 故障
+      status = "down";
+    } else if (dateStr > today) {
+      // 未来日期显示为灰色
+      color = "bg-slate-300";
+      status = "future";
+    }
+    // 如果没有故障日志，即使没有响应数据也默认显示为绿色（正常）
+    
+    return {
+      date: dateStr,
+      color,
+      status,
+      hasResponseData,
+      hasDownLog,
+      downDuration,
+      uptime,
+      incidentCount: dayLogs.filter((log) => log.type === 1 || log.type === 99).length,
+    };
+  });
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60">
+      <div className="mb-3 flex items-center justify-between gap-2 text-sm text-slate-700">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/monitor/${monitor.id}`}
+            className="font-medium text-slate-900 hover:text-emerald-600 hover:underline"
+          >
+            {monitor.name}
+          </Link>
+          <span className="text-xs text-slate-500">
+            |
+            {" "}
+            {monitor.uptimeRatio.last90Days !== null
+              ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
+              : "—"}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <StatusBadge
+            status={monitor.status}
+            label={t(`monitor.status.${monitor.status}` as const)}
+          />
+          {SHOW_LINKS ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.open(
+                  monitor.url.startsWith("http")
+                    ? monitor.url
+                    : `https://${monitor.url}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                );
+              }}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-600 shadow-sm transition hover:bg-emerald-50"
+            >
+              {t("monitor.viewSite")}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-3 py-2">
+          <div className="flex gap-[2px]">
+            {dayData.map((day, index) => (
+              <div
+                key={index}
+                className={`relative h-6 flex-1 rounded ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
+                onMouseEnter={() => setHoveredBar(index)}
+                onMouseLeave={() => setHoveredBar(null)}
+              >
+                {hoveredBar === index && (
+                  <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-4 py-3 text-xs text-white shadow-xl">
+                    <div className="font-semibold">{day.date}</div>
+                    <div className="mt-1.5 space-y-1 text-slate-200">
+                      {day.status === "future" ? (
+                        <div className="text-slate-400">未来日期</div>
+                      ) : (
+                        <>
+                          <div className={day.hasDownLog ? "text-rose-300" : "text-emerald-300"}>
+                            可用率: {formatNumber(day.uptime)}%
+                          </div>
+                          {day.hasDownLog && (
+                            <>
+                              {day.incidentCount > 0 && (
+                                <div>故障次数: {day.incidentCount}</div>
+                              )}
+                              {day.downDuration > 0 && (
+                                <div>
+                                  宕机时长: {formatDuration(day.downDuration)}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="whitespace-nowrap text-xs text-slate-500">
+          {monitor.lastCheckedAt
+            ? dayjs(monitor.lastCheckedAt).format("YYYY-MM-DD HH:mm")
+            : ""}
+        </span>
+      </div>
     </div>
   );
 }
