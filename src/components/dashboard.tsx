@@ -396,7 +396,7 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
               : "—"}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <StatusBadge
             status={monitor.status}
             label={t(`monitor.status.${monitor.status}` as const)}
@@ -413,20 +413,38 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
                   "noopener,noreferrer",
                 );
               }}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-600 shadow-sm transition hover:bg-emerald-50"
+              className="inline-flex cursor-pointer items-center justify-center rounded-full bg-white p-1.5 text-emerald-600 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-700"
+              title={t("monitor.viewSite")}
+              aria-label={t("monitor.viewSite")}
             >
-              {t("monitor.viewSite")}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                  clipRule="evenodd"
+                />
+                <path
+                  fillRule="evenodd"
+                  d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                  clipRule="evenodd"
+                />
+              </svg>
             </button>
           ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-3 py-2">
-          <div className="flex gap-[2px]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
+          <div className="flex gap-0.5 sm:gap-[2px]">
             {dayData.map((day, index) => (
               <div
                 key={index}
-                className={`relative h-6 flex-1 rounded ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
+                className={`relative h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
                 onMouseEnter={() => setHoveredBar(index)}
                 onMouseLeave={() => setHoveredBar(null)}
               >
@@ -463,7 +481,7 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
             ))}
           </div>
         </div>
-        <span className="whitespace-nowrap text-xs text-slate-500">
+        <span className="whitespace-nowrap text-xs text-slate-500 sm:text-right">
           {monitor.lastCheckedAt
             ? dayjs(monitor.lastCheckedAt).format("YYYY-MM-DD HH:mm")
             : ""}
