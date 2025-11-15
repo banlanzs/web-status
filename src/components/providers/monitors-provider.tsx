@@ -27,6 +27,7 @@ interface MonitorsProviderProps {
 
 // 客户端缓存配置
 const CLIENT_CACHE_TTL = 30 * 1000; // 30 秒客户端缓存
+const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 分钟自动刷新间隔
 const CACHE_KEY = "monitors_cache";
 const CACHE_TIME_KEY = "monitors_cache_time";
 
@@ -36,7 +37,7 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // 客户端挂载后立即从缓存读取数据
+  // 客户端挂载后立即从缓存读取数据，并检查是否需要刷新
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -45,12 +46,24 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
         
         if (cached && cachedTime) {
           const cachedData = JSON.parse(cached);
+          const cacheAge = Date.now() - parseInt(cachedTime, 10);
+          
+          // 先显示缓存数据
           setMonitors(cachedData);
           setLastUpdated(new Date(parseInt(cachedTime, 10)));
           setIsLoading(false);
-          console.log("[Monitors Provider] 从缓存加载数据");
+          console.log(`[Monitors Provider] 从缓存加载数据 (缓存年龄: ${Math.round(cacheAge / 1000)} 秒)`);
+          
+          // 如果缓存超过5分钟，自动刷新
+          if (cacheAge > AUTO_REFRESH_INTERVAL) {
+            console.log(`[Monitors Provider] 缓存已过期 (超过 ${AUTO_REFRESH_INTERVAL / 60000} 分钟)，自动刷新...`);
+            setTimeout(() => {
+              loadData();
+            }, 500); // 延迟500ms，让用户先看到缓存数据
+          }
         } else {
           // 如果没有缓存，则首次加载数据
+          console.log("[Monitors Provider] 无缓存，首次加载数据");
           loadData();
         }
       } catch (e) {
