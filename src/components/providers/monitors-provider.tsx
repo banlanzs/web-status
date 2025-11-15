@@ -40,37 +40,43 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
   // 客户端挂载后立即从缓存读取数据，并检查是否需要刷新
   useEffect(() => {
     if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
-        
-        if (cached && cachedTime) {
-          const cachedData = JSON.parse(cached);
-          const cacheAge = Date.now() - parseInt(cachedTime, 10);
+      const initializeData = async () => {
+        try {
+          const cached = localStorage.getItem(CACHE_KEY);
+          const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
           
-          // 先显示缓存数据
-          setMonitors(cachedData);
-          setLastUpdated(new Date(parseInt(cachedTime, 10)));
-          setIsLoading(false);
-          console.log(`[Monitors Provider] 从缓存加载数据 (缓存年龄: ${Math.round(cacheAge / 1000)} 秒)`);
-          
-          // 如果缓存超过5分钟，自动刷新
-          if (cacheAge > AUTO_REFRESH_INTERVAL) {
-            console.log(`[Monitors Provider] 缓存已过期 (超过 ${AUTO_REFRESH_INTERVAL / 60000} 分钟)，自动刷新...`);
-            setTimeout(() => {
-              loadData();
-            }, 500); // 延迟500ms，让用户先看到缓存数据
+          if (cached && cachedTime) {
+            const cachedData = JSON.parse(cached);
+            const cacheAge = Date.now() - parseInt(cachedTime, 10);
+            
+            console.log(`[Monitors Provider] 发现缓存数据 (缓存年龄: ${Math.round(cacheAge / 1000)} 秒)`);
+            
+            // 如果缓存超过5分钟，执行真刷新
+            if (cacheAge > AUTO_REFRESH_INTERVAL) {
+              console.log(`[Monitors Provider] 缓存已过期 (超过 ${AUTO_REFRESH_INTERVAL / 60000} 分钟)，执行真刷新...`);
+              await loadData();
+            } else {
+              // 缓存未过期，模拟加载然后显示缓存数据
+              console.log(`[Monitors Provider] 缓存未过期，使用缓存数据`);
+              // 模拟加载时间，让用户看到加载状态
+              await new Promise(resolve => setTimeout(resolve, 800));
+              setMonitors(cachedData);
+              setLastUpdated(new Date(parseInt(cachedTime, 10)));
+              setIsLoading(false);
+            }
+          } else {
+            // 如果没有缓存，则首次加载数据
+            console.log("[Monitors Provider] 无缓存，首次加载数据");
+            await loadData();
           }
-        } else {
-          // 如果没有缓存，则首次加载数据
-          console.log("[Monitors Provider] 无缓存，首次加载数据");
-          loadData();
+        } catch (e) {
+          console.error("[Monitors Provider] 初始化失败:", e);
+          // 出错时尝试加载数据
+          await loadData();
         }
-      } catch (e) {
-        console.error("[Monitors Provider] 读取缓存失败:", e);
-        // 缓存读取失败，首次加载数据
-        loadData();
-      }
+      };
+      
+      initializeData();
     }
   }, []);
 

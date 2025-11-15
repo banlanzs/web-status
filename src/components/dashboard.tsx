@@ -109,7 +109,7 @@ export function Dashboard({
 
   // 动态更新favicon和页面标题
   useEffect(() => {
-    const updateFavicon = (color: string) => {
+    const updateFavicon = (color: string, hasIssue: boolean) => {
       const canvas = document.createElement("canvas");
       canvas.width = 32;
       canvas.height = 32;
@@ -122,18 +122,43 @@ export function Dashboard({
       ctx.arc(16, 16, 14, 0, 2 * Math.PI);
       ctx.fill();
 
-      // 更新或创建favicon链接
-      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "shortcut icon";
-        document.getElementsByTagName("head")[0].appendChild(link);
+      // 绘制图标
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      if (hasIssue) {
+        // 绘制感叹号
+        ctx.beginPath();
+        ctx.moveTo(16, 9);
+        ctx.lineTo(16, 17);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(16, 21, 1.5, 0, 2 * Math.PI);
+        ctx.fillStyle = "white";
+        ctx.fill();
+      } else {
+        // 绘制对号
+        ctx.beginPath();
+        ctx.moveTo(10, 16);
+        ctx.lineTo(14, 20);
+        ctx.lineTo(22, 12);
+        ctx.stroke();
       }
+
+      // 移除所有现有的 favicon 链接
+      document.querySelectorAll("link[rel*='icon']").forEach(link => link.remove());
+      
+      // 创建新的 favicon 链接
+      const link = document.createElement("link");
+      link.rel = "icon";
       link.type = "image/png";
       link.href = canvas.toDataURL();
+      document.getElementsByTagName("head")[0].appendChild(link);
     };
 
-    updateFavicon(hasIssues ? "#fbbf24" : "#10b981");
+    updateFavicon(hasIssues ? "#fbbf24" : "#10b981", hasIssues);
     
     // 更新页面标题，添加状态指示
     const statusEmoji = hasIssues ? "⚠️" : "✅";
