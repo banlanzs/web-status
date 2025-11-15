@@ -41,16 +41,18 @@ export function Dashboard({
   const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
   const displayError = error || initialError;
 
+  // 当 lastUpdated 变化时，重置倒计时（包括自动刷新和手动刷新）
   useEffect(() => {
     setSecondsLeft(refreshInterval);
   }, [refreshInterval, lastUpdated]);
 
+  // 自动刷新倒计时
   useEffect(() => {
     if (refreshInterval <= 0) return;
     const timer = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          refresh(); // 使用 Provider 的 refresh 方法
+          refresh(true); // 自动刷新使用强制真刷新，跳过30秒限制
           return refreshInterval;
         }
         return prev - 1;
@@ -61,8 +63,8 @@ export function Dashboard({
 
   // 手动刷新函数
   const handleForceRefresh = async () => {
-    await refresh();
-    setSecondsLeft(refreshInterval);
+    await refresh(false); // 手动刷新受30秒限制（无论上次刷新是手动还是自动）
+    // 不需要手动设置 setSecondsLeft，因为真刷新时 lastUpdated 变化会触发 useEffect 重置倒计时
   };
 
   const summary = useMemo(() => {
@@ -258,7 +260,14 @@ export function Dashboard({
             </span>
             {refreshInterval > 0 ? (
               <span className="rounded-full bg-white/10 px-3 py-1 text-center whitespace-nowrap">
-                {t("app.nextRefresh", { seconds: secondsLeft })}
+                {(() => {
+                  const minutes = Math.floor(secondsLeft / 60);
+                  const seconds = secondsLeft % 60;
+                  if (minutes > 0) {
+                    return t("app.nextRefresh", { seconds: `${minutes}分${seconds}秒` });
+                  }
+                  return t("app.nextRefresh", { seconds: `${seconds}秒` });
+                })()}
               </span>
             ) : null}
             <span className="rounded-full bg-white/10 px-3 py-1 text-center whitespace-nowrap">

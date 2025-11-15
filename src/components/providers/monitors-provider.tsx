@@ -7,7 +7,7 @@ interface MonitorsContextValue {
   monitors: NormalizedMonitor[];
   isLoading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  refresh: (forceRefresh?: boolean) => Promise<void>;
   lastUpdated: Date | null;
 }
 
@@ -103,7 +103,7 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
     }
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
     
     // 从 localStorage 读取上次刷新时间
@@ -121,8 +121,8 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
     
     const timeSinceLastFetch = now - lastFetchTime;
 
-    // 如果距离上次获取不到 30 秒，使用缓存数据（假刷新）
-    if (timeSinceLastFetch < CLIENT_CACHE_TTL) {
+    // 如果不是强制刷新且距离上次获取不到 30 秒，使用缓存数据（假刷新）
+    if (!forceRefresh && timeSinceLastFetch < CLIENT_CACHE_TTL) {
       console.log(
         `[Monitors Provider] 假刷新 - 使用缓存数据 (距离上次刷新 ${Math.round(timeSinceLastFetch / 1000)} 秒，需等待 ${Math.round((CLIENT_CACHE_TTL - timeSinceLastFetch) / 1000)} 秒)`
       );
@@ -131,13 +131,12 @@ export function MonitorsProvider({ children }: MonitorsProviderProps) {
       // 使用 setTimeout 模拟加载效果
       setTimeout(() => {
         setIsLoading(false);
-        // 更新 lastUpdated 让用户看到时间变化
-        setLastUpdated(new Date());
       }, 300); // 300ms 的假加载时间
       return;
     }
 
-    // 超过 30 秒，真刷新
+    // 超过 30 秒或强制刷新，执行真刷新
+    console.log(`[Monitors Provider] 真刷新 - ${forceRefresh ? '强制刷新' : '距离上次刷新 ' + Math.round(timeSinceLastFetch / 1000) + ' 秒'}`);
     await loadData();
   }, []);
 
