@@ -348,180 +348,204 @@ const SHOW_LINKS =
   process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "false" &&
   process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "0";
 
-const STATUS_DAYS = Number(
-  process.env.NEXT_PUBLIC_STATUS_DAYS ?? 60,
-);
-
-function MonitorListItem({ monitor }: MonitorListItemProps) {
-  const { t } = useLanguage();
-  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
-  const segments = STATUS_DAYS;
-
-  // 为每一天构建状态数据
-  const dayData = Array.from({ length: segments }, (_, index) => {
-    const date = dayjs().subtract(segments - 1 - index, "day");
-    const dateStr = date.format("YYYY-MM-DD");
-    const today = dayjs().format("YYYY-MM-DD");
-    
-    // 检查该天是否有故障日志
-    const dayLogs = monitor.logs.filter((log) => {
-      const logDate = dayjs(log.datetime).format("YYYY-MM-DD");
-      return logDate === dateStr;
-    });
-    
-    const hasDownLog = dayLogs.some((log) => log.type === 1 || log.type === 99);
-    const downDuration = dayLogs
-      .filter((log) => log.type === 1 || log.type === 99)
-      .reduce((sum, log) => sum + (log.duration || 0), 0);
-    
-    // 计算当天可用率：一天86400秒，减去宕机时长
-    const daySeconds = 86400;
-    const uptime = downDuration > 0 
-      ? ((daySeconds - downDuration) / daySeconds) * 100
-      : 100;
-    
-    // 确定颜色：历史故障显示黄色，当前故障显示红色
-    let color = "bg-emerald-500"; // 默认正常
-    let status = "normal";
-    
-    if (dateStr > today) {
-      // 未来日期显示为灰色
-      color = "bg-slate-300";
-      status = "future";
-    } else if (hasDownLog) {
-      // 如果是今天且当前监控状态是down，显示红色
-      if (dateStr === today && monitor.status === "down") {
-        color = "bg-rose-500"; // 当前故障 - 红色
-        status = "down";
-      } else {
-        // 历史故障或已恢复的故障 - 黄色
-        color = "bg-amber-500";
-        status = "warning";
-      }
-    }
-    // 如果没有故障日志，默认显示为绿色（正常）
-    
-    return {
-      date: dateStr,
-      color,
-      status,
-      hasDownLog,
-      downDuration,
-      uptime,
-      incidentCount: dayLogs.filter((log) => log.type === 1 || log.type === 99).length,
-    };
-  });
-
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60">
-      <div className="mb-3 flex items-center justify-between gap-2 text-sm text-slate-700">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/monitor/${monitor.id}`}
-            className="font-medium text-slate-900 hover:text-emerald-600 hover:underline"
-          >
-            {monitor.name}
-          </Link>
-          <span className="text-xs text-slate-500">
-            |
-            {" "}
-            {monitor.uptimeRatio.last90Days !== null
-              ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
-              : "—"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge
-            status={monitor.status}
-            label={t(`monitor.status.${monitor.status}` as const)}
-          />
-          {SHOW_LINKS ? (
-            <button
-              type="button"
-              onClick={() => {
-                window.open(
-                  monitor.url.startsWith("http")
-                    ? monitor.url
-                    : `https://${monitor.url}`,
-                  "_blank",
-                  "noopener,noreferrer",
-                );
-              }}
-              className="inline-flex cursor-pointer items-center justify-center rounded-full bg-white p-1.5 text-emerald-600 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-700"
-              title={t("monitor.viewSite")}
-              aria-label={t("monitor.viewSite")}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-4 w-4"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                  clipRule="evenodd"
-                />
-                <path
-                  fillRule="evenodd"
-                  d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
-          <div className="flex gap-0.5 sm:gap-[2px]">
-            {dayData.map((day, index) => (
-              <div
-                key={index}
-                className={`relative h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
-                onMouseEnter={() => setHoveredBar(index)}
-                onMouseLeave={() => setHoveredBar(null)}
-              >
-                {hoveredBar === index && (
-                  <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-4 py-3 text-xs text-white shadow-xl">
-                    <div className="font-semibold">{day.date}</div>
-                    <div className="mt-1.5 space-y-1 text-slate-200">
-                      {day.status === "future" ? (
-                        <div className="text-slate-400">未来日期</div>
-                      ) : (
-                        <>
-                          <div className={day.hasDownLog ? "text-rose-300" : "text-emerald-300"}>
-                            可用率: {formatNumber(day.uptime)}%
-                          </div>
-                          {day.hasDownLog && (
-                            <>
-                              {day.incidentCount > 0 && (
-                                <div>故障次数: {day.incidentCount}</div>
-                              )}
-                              {day.downDuration > 0 && (
-                                <div>
-                                  宕机时长: {formatDuration(day.downDuration)}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        <span className="whitespace-nowrap text-xs text-slate-500 sm:text-right">
-          {monitor.lastCheckedAt
-            ? dayjs(monitor.lastCheckedAt).format("YYYY-MM-DD HH:mm")
-            : ""}
-        </span>
-      </div>
-    </div>
-  );
+const STATUS_DAYS = Number(
+  process.env.NEXT_PUBLIC_STATUS_DAYS ?? 60,
+);
+
+function MonitorListItem({ monitor }: MonitorListItemProps) {
+  const { t } = useLanguage();
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const segments = STATUS_DAYS;
+
+  // 计算监控创建日期（如果有）
+  const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : null;
+
+  // 为每一天构建状态数据
+  const dayData = Array.from({ length: segments }, (_, index) => {
+    const date = dayjs().subtract(segments - 1 - index, "day");
+    const dateStr = date.format("YYYY-MM-DD");
+    const today = dayjs().format("YYYY-MM-DD");
+    const createDateString = createDate ? createDate.format("YYYY-MM-DD") : null;
+    
+    // 检查这一天是否在监控创建之后（不包括创建当天，只包括创建之后的日期）
+    const isAfterCreate = !createDate || date.isAfter(createDate);
+    
+    // 如果不在创建日期之后，标记为无数据
+    if (!isAfterCreate) {
+      return {
+        date: dateStr,
+        color: "bg-slate-300", // 灰色表示无数据
+        status: "nodata",
+        hasDownLog: false,
+        downDuration: 0,
+        uptime: -1, // -1 表示无数据
+        incidentCount: 0,
+        hasData: false, // 标记为无数据
+      };
+    }
+    
+    // 检查该天是否有故障日志
+    const dayLogs = monitor.logs.filter((log) => {
+      const logDate = dayjs(log.datetime).format("YYYY-MM-DD");
+      return logDate === dateStr;
+    });
+    
+    const hasDownLog = dayLogs.some((log) => log.type === 1 || log.type === 99);
+    const downDuration = dayLogs
+      .filter((log) => log.type === 1 || log.type === 99)
+      .reduce((sum, log) => sum + (log.duration || 0), 0);
+    
+    // 计算当天可用率：一天86400秒，减去宕机时长
+    const daySeconds = 86400;
+    const uptime = downDuration > 0 
+      ? ((daySeconds - downDuration) / daySeconds) * 100
+      : 100;
+    
+    // 确定颜色：历史故障显示黄色，当前故障显示红色
+    let color = "bg-emerald-500"; // 默认正常
+    let status = "normal";
+    
+    if (dateStr > today) {
+      // 未来日期显示为灰色
+      color = "bg-slate-300";
+      status = "future";
+    } else if (hasDownLog) {
+      // 如果是今天且当前监控状态是down，显示红色
+      if (dateStr === today && monitor.status === "down") {
+        color = "bg-rose-500"; // 当前故障 - 红色
+        status = "down";
+      } else {
+        // 历史故障或已恢复的故障 - 黄色
+        color = "bg-amber-500";
+        status = "warning";
+      }
+    }
+    // 如果没有故障日志，默认显示为绿色（正常）
+    
+    return {
+      date: dateStr,
+      color,
+      status,
+      hasDownLog,
+      downDuration,
+      uptime,
+      incidentCount: dayLogs.filter((log) => log.type === 1 || log.type === 99).length,
+      hasData: true, // 标记为有数据
+    };
+  });
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60">
+      <div className="mb-3 flex items-center justify-between gap-2 text-sm text-slate-700">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/monitor/${monitor.id}`}
+            className="font-medium text-slate-900 hover:text-emerald-600 hover:underline"
+          >
+            {monitor.name}
+          </Link>
+          <span className="text-xs text-slate-500">
+            |
+            {" "}
+            {monitor.uptimeRatio.last90Days !== null
+              ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
+              : "—"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge
+            status={monitor.status}
+            label={t(`monitor.status.${monitor.status}` as const)}
+          />
+          {SHOW_LINKS ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.open(
+                  monitor.url.startsWith("http")
+                    ? monitor.url
+                    : `https://${monitor.url}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                );
+              }}
+              className="inline-flex cursor-pointer items-center justify-center rounded-full bg-white p-1.5 text-emerald-600 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-700"
+              title={t("monitor.viewSite")}
+              aria-label={t("monitor.viewSite")}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                  clipRule="evenodd"
+                />
+                <path
+                  fillRule="evenodd"
+                  d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
+          <div className="flex gap-0.5 sm:gap-[2px]">
+            {dayData.map((day, index) => (
+              <div
+                key={index}
+                className={`relative h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
+                onMouseEnter={() => setHoveredBar(index)}
+                onMouseLeave={() => setHoveredBar(null)}
+              >
+                {hoveredBar === index && (
+                  <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-4 py-3 text-xs text-white shadow-xl">
+                    <div className="font-semibold">{day.date}</div>
+                    <div className="mt-1.5 space-y-1 text-slate-200">
+                      {day.status === "future" ? (
+                        <div className="text-slate-400">未来日期</div>
+                      ) : day.status === "nodata" ? (
+                        <div className="text-slate-400">无数据</div>
+                      ) : (
+                        <>
+                          <div className={day.hasDownLog ? "text-rose-300" : "text-emerald-300"}>
+                            可用率: {day.uptime >= 0 ? formatNumber(day.uptime) + "%" : "—"}
+                          </div>
+                          {day.hasDownLog && (
+                            <>
+                              {day.incidentCount > 0 && (
+                                <div>故障次数: {day.incidentCount}</div>
+                              )}
+                              {day.downDuration > 0 && (
+                                <div>
+                                  宕机时长: {formatDuration(day.downDuration)}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-900" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <span className="whitespace-nowrap text-xs text-slate-500 sm:text-right">
+          {monitor.lastCheckedAt
+            ? dayjs(monitor.lastCheckedAt).format("YYYY-MM-DD HH:mm")
+            : ""}
+        </span>
+      </div>
+    </div>
+  );
 }
 

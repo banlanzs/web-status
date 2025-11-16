@@ -122,67 +122,68 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
   return { normalized: cleanedNormalized, incidents: { total, totalDowntimeSeconds, downCount, pauseCount } };
 }
 
-function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
-  // v2 API 使用 snake_case 字段名
-  
-  // UptimeRobot API 不提供 "最后检查时间" 字段
-  // 使用当前时间表示数据获取时间
-  const lastCheckedAt = dayjs().toISOString();
-
-  const { normalized: logs, incidents } = normalizeLogs(monitor.logs);
-
-  // 处理 uptime ratio 数据
-  const uptimeRatio = {
-    // 7天数据是第一个（索引为0）时间段
-    last7Days: monitor.custom_uptime_ratio ? 
-      (() => {
-        const segments = monitor.custom_uptime_ratio?.split("-");
-        if (!segments || segments.length === 0) return null;
-        const value = parseFloat(segments[0] ?? "");
-        return Number.isFinite(value) ? value : null;
-      })() : null,
-    // 30天数据是第二个（索引为1）时间段
-    last30Days: monitor.custom_uptime_ratio ? 
-      (() => {
-        const segments = monitor.custom_uptime_ratio?.split("-");
-        if (!segments || segments.length <= 1) return null;
-        const value = parseFloat(segments[1] ?? "");
-        return Number.isFinite(value) ? value : null;
-      })() : null,
-    // 90天数据是第三个（索引为2）时间段
-    last90Days: monitor.custom_uptime_ratio ? 
-      (() => {
-        const segments = monitor.custom_uptime_ratio?.split("-");
-        if (!segments || segments.length <= 2) return null;
-        const value = parseFloat(segments[2] ?? "");
-        return Number.isFinite(value) ? value : null;
-      })() : null,
-  };
-
-  // 处理宕机时长数据 - 从 incidents 中获取，而不是从 API
-  const downDuration = {
-    last7Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
-    last30Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
-    // 使用从日志计算出的总宕机时长
-    last90Days: incidents.totalDowntimeSeconds > 0 ? incidents.totalDowntimeSeconds : null,
-  };
-
-  return {
-    id: monitor.id,
-    name: monitor.friendly_name,
-    url: monitor.url,
-    type: MONITOR_TYPE_LABEL[monitor.type] ?? `Type ${monitor.type}`,
-    interval: monitor.interval,
-    status: STATUS_MAP[monitor.status] ?? "unknown",
-    statusCode: monitor.status,
-    uptimeRatio,
-    downDuration,
-    logs,
-    logs24h: [],
-    incidents,
-    incidents24h: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
-    lastCheckedAt,
-  };
+function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
+  // v2 API 使用 snake_case 字段名
+  
+  // UptimeRobot API 不提供 "最后检查时间" 字段
+  // 使用当前时间表示数据获取时间
+  const lastCheckedAt = dayjs().toISOString();
+
+  const { normalized: logs, incidents } = normalizeLogs(monitor.logs);
+
+  // 处理 uptime ratio 数据
+  const uptimeRatio = {
+    // 7天数据是第一个（索引为0）时间段
+    last7Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length === 0) return null;
+        const value = parseFloat(segments[0] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
+    // 30天数据是第二个（索引为1）时间段
+    last30Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length <= 1) return null;
+        const value = parseFloat(segments[1] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
+    // 90天数据是第三个（索引为2）时间段
+    last90Days: monitor.custom_uptime_ratio ? 
+      (() => {
+        const segments = monitor.custom_uptime_ratio?.split("-");
+        if (!segments || segments.length <= 2) return null;
+        const value = parseFloat(segments[2] ?? "");
+        return Number.isFinite(value) ? value : null;
+      })() : null,
+  };
+
+  // 处理宕机时长数据 - 从 incidents 中获取，而不是从 API
+  const downDuration = {
+    last7Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
+    last30Days: null, // 暂时设为 null，可以后续根据需要从日志中计算
+    // 使用从日志计算出的总宕机时长
+    last90Days: incidents.totalDowntimeSeconds > 0 ? incidents.totalDowntimeSeconds : null,
+  };
+
+  return {
+    id: monitor.id,
+    name: monitor.friendly_name,
+    url: monitor.url,
+    type: MONITOR_TYPE_LABEL[monitor.type] ?? `Type ${monitor.type}`,
+    interval: monitor.interval,
+    createDatetime: monitor.create_datetime, // 添加创建日期
+    status: STATUS_MAP[monitor.status] ?? "unknown",
+    statusCode: monitor.status,
+    uptimeRatio,
+    downDuration,
+    logs,
+    logs24h: [],
+    incidents,
+    incidents24h: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
+    lastCheckedAt,
+  };
 }
 
 export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMonitor[]> {
@@ -259,18 +260,20 @@ export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMoni
   const logsStartDate = now.subtract(90, "day").unix();
   const logsEndDate = now.unix();
   
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    format: "json",
-    logs: "1",
-    logs_limit: "300", // 增加日志限制以获取更多历史记录
-    log_types: "1-2-99", // 1=宕机, 2=恢复, 99=暂停
-    logs_start_date: String(logsStartDate),
-    logs_end_date: String(logsEndDate),
-    response_times: "1",
-    response_times_limit: String(RESPONSE_TIMES_LIMIT), // 使用常量，获取尽可能多的响应时间数据
-    custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
-    custom_uptime_ratios: "7-30-90",
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    format: "json",
+    logs: "1",
+    logs_limit: "300", // 增加日志限制以获取更多历史记录
+    log_types: "1-2-99", // 1=宕机, 2=恢复, 99=暂停
+    logs_start_date: String(logsStartDate),
+    logs_end_date: String(logsEndDate),
+    response_times: "1",
+    response_times_limit: String(RESPONSE_TIMES_LIMIT), // 使用常量，获取尽可能多的响应时间数据
+    custom_uptime_ranges: CUSTOM_UPTIME_RANGES,
+    custom_uptime_ratios: "7-30-90",
+    // 添加创建日期字段
+    fields: "id,friendly_name,url,type,status,interval,create_datetime,custom_uptime_ratio,logs,response_times",
   });
 
   // 执行主请求（带 response_times 时间范围，默认最近 7 天）
