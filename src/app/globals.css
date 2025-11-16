@@ -24,4 +24,20 @@ html {
 
 .wave-animation {
   animation: wave 20s linear infinite;
+  will-change: transform;
+  /* 使用 GPU 加速 */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* 优化路由切换时的 DOM 清理 */
+body {
+  /* 确保在路由切换时快速清理悬停状态 */
+  pointer-events: auto;
+}
+
+/* 确保绝对定位的元素在父元素移除时也被移除 */
+.pointer-events-none {
+  pointer-events: none !important;
 }

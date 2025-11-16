@@ -10,33 +10,15 @@ export function ForceRefreshDetector() {
   const router = useRouter();
 
   useEffect(() => {
-    // 检查是否从详情页返回到首页
-    const handlePopState = () => {
-      // 如果是从监控详情页返回到首页，强制刷新数据
-      if (pathname === "/" && document.referrer.includes("/monitor/")) {
-        // 添加查询参数来标记强制刷新
-        const url = new URL(window.location.href);
-        url.searchParams.set('force', Date.now().toString());
-        router.push(url.toString());
-        router.refresh();
-      }
-    };
-
-    // 添加浏览器历史记录变化的监听器
-    window.addEventListener("popstate", handlePopState);
-
-    // 检查当前页面是否是从详情页导航过来的
-    if (pathname === "/" && document.referrer.includes("/monitor/")) {
-      // 添加查询参数来标记强制刷新
+    // 只处理 force 参数的清理，避免其他操作
+    if (pathname === "/" && searchParams.get('force')) {
+      // 创建不带 force 参数的新 URL
       const url = new URL(window.location.href);
-      url.searchParams.set('force', Date.now().toString());
-      router.push(url.toString());
-      router.refresh();
+      url.searchParams.delete('force');
+      
+      // 使用 replace 而不是 push 来避免添加到浏览器历史
+      router.replace(url.pathname + url.search);
     }
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
   }, [pathname, searchParams, router]);
 
   return null;

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { LanguageProvider } from "@/components/providers/language-provider";
 import { MonitorsProvider } from "@/components/providers/monitors-provider";
 import { RateLimitIndicator } from "@/components/rate-limit-indicator";
+import ErrorBoundary from "@/components/error-boundary";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,12 +39,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LanguageProvider>
-          <MonitorsProvider>
-            {children}
-            <RateLimitIndicator />
-          </MonitorsProvider>
-        </LanguageProvider>
+        <ErrorBoundary>
+          <LanguageProvider>
+            <MonitorsProvider>
+              {children}
+              <RateLimitIndicator />
+            </MonitorsProvider>
+          </LanguageProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
