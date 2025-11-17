@@ -31,6 +31,9 @@ const baseTranslations = {
       viewSite: "访问站点",
       linkDisabled: "已隐藏访问链接",
       responseChartTitle: "近期响应时间 (ms)",
+      noData: "无数据",
+      today: "今天",
+      uptimePercent: "可用率 {{percent}}%",
     },
     language: {
       label: "语言",
@@ -75,6 +78,9 @@ const baseTranslations = {
       viewSite: "Visit site",
       linkDisabled: "Link hidden",
       responseChartTitle: "Recent response time (ms)",
+      noData: "No data",
+      today: "Today",
+      uptimePercent: "{{percent}}% uptime",
     },
     language: {
       label: "Language",
