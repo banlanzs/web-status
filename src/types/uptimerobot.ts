@@ -49,6 +49,10 @@ export interface DailyStatus {
     times: number; // 当天故障次数
     duration: number; // 当天故障时长（秒）
   };
+  pause: {
+    times: number; // 当天暂停次数
+    duration: number; // 当天暂停时长（秒）
+  };
 }
 
 export interface NormalizedMonitor {

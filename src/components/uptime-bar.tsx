@@ -18,27 +18,23 @@ export function UptimeBar({ dailyStatus, className }: UptimeBarProps) {
   const [clickedDay, setClickedDay] = useState<number | null>(null);
 
   // 根据正常运行时间百分比和故障记录获取状态类型
-  const getStatusType = (day: DailyStatus): "normal" | "warn" | "error" | "unknown" => {
-    // 无数据
+  const getStatusType = (day: DailyStatus): "normal" | "warn" | "error" | "unknown" | "paused" => {
+    // 1. 无数据
     if (day.uptime < 0) return "unknown";
 
-    // 有故障记录（宕机或暂停）
+    // 2. 暂停
+    if (day.pause && (day.pause.duration > 0 || day.pause.times > 0)) {
+      return "paused";
+    }
+
+    // 3. 宕机
     if (day.down.times > 0 || day.down.duration > 0) {
-      // 可用率低于50%显示为错误（红色）
-      if (day.uptime < 50) return "error";
-      // 可用率50-90%显示为警告（橙色）
-      if (day.uptime < 90) return "warn";
-      // 可用率90-100%但有故障，显示为警告（橙色）
+      if (day.uptime < 90) return "error";
       return "warn";
     }
 
-    // 无故障记录且可用率100%
-    if (day.uptime >= 100) return "normal";
-
-    // 可用率不是100%但没有故障记录（可能是轻微问题）
-    if (day.uptime >= 98) return "normal";
-    if (day.uptime >= 90) return "warn";
-    return "error";
+    // 4. 正常
+    return "normal";
   };
 
   // 处理点击事件（移动端）
@@ -57,6 +53,7 @@ export function UptimeBar({ dailyStatus, className }: UptimeBarProps) {
     warn: "bg-orange-400",
     error: "bg-red-500",
     unknown: "bg-gray-200",
+    paused: "bg-gray-400",
   };
 
   return (
@@ -96,11 +93,13 @@ export function UptimeBar({ dailyStatus, className }: UptimeBarProps) {
                   <div className="mt-0.5 text-slate-300">
                     {day.uptime < 0
                       ? t("monitor.noData")
-                      : day.down.times > 0
-                        ? `${t("monitor.uptimePercent", { percent: day.uptime.toFixed(2) })} · ${day.down.times} 次故障 · ${formatDuration(day.down.duration)}`
-                        : day.uptime === 0
-                          ? "完全宕机 · 可用率 0%"
-                          : t("monitor.uptimePercent", { percent: day.uptime.toFixed(2) })
+                      : status === "paused"
+                        ? `${t("monitor.status.paused")}${day.pause.duration > 0 ? ` · ${formatDuration(day.pause.duration)}` : ''}`
+                        : day.down.times > 0
+                          ? `${t("monitor.uptimePercent", { percent: day.uptime.toFixed(2) })} · ${day.down.times} 次故障 · ${formatDuration(day.down.duration)}`
+                          : day.uptime === 0
+                            ? "完全宕机 · 可用率 0%"
+                            : t("monitor.uptimePercent", { percent: day.uptime.toFixed(2) })
                     }
                   </div>
                   {/* 箭头 */}

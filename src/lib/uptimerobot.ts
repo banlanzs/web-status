@@ -134,7 +134,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
       // 计算故障时长
       let duration = log.duration || 0;
       
-      // 如果没有 duration 或 duration 为 0，说明可能还在宕机中
+      // 如果没有 duration 或 duration 为 0，说明可能还在持续中
       if (!duration || duration === 0) {
         // 查找下一个恢复日志 (type: 2) 或启动日志 (type: 98)
         const nextLog = normalized.slice(i + 1).find(l => l.type === 2 || l.type === 98);
@@ -143,12 +143,15 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
           // 找到了恢复日志，计算时长
           duration = nextLog.parsedDate.diff(log.parsedDate, 'second');
         } else {
-          // 没有找到恢复日志，说明还在宕机中，计算到现在的时长
+          // 没有找到恢复日志，说明还在持续中，计算到现在的时长
           duration = now.diff(log.parsedDate, 'second');
         }
       }
       
-      totalDowntimeSeconds += duration;
+      // 只有在 log.type 为 1 (宕机) 时才累加到 totalDowntimeSeconds
+      if (log.type === 1) {
+        totalDowntimeSeconds += duration;
+      }
       
       // 更新日志的 duration
       normalized[i] = {
@@ -187,58 +190,36 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
 
 
 
-  // 处理 uptime ratio 数据
+  // --- 手动计算不同时间段的可用率 ---
+  const createDate = monitor.create_datetime ? dayjs.unix(monitor.create_datetime) : dayjs();
+  const now = dayjs();
+
+  const calculateUptime = (days: number): number | null => {
+    const periodStart = now.subtract(days, 'day');
+    // 确保计算的开始时间不早于监控创建时间
+    const effectiveStart = createDate.isAfter(periodStart) ? createDate : periodStart;
+    const totalSeconds = now.diff(effectiveStart, 'second');
+
+    if (totalSeconds <= 0) {
+      return 100; // 如果总时长为0或负数，则认为100%可用
+    }
+
+    const downtimeSeconds = logs
+      .filter(log => {
+        const logDate = dayjs(log.datetime);
+        // 只关心类型为1（宕机）的日志
+        return log.type === 1 && logDate.isAfter(effectiveStart);
+      })
+      .reduce((acc, log) => acc + (log.duration || 0), 0);
+
+    const uptimePercentage = ((totalSeconds - downtimeSeconds) / totalSeconds) * 100;
+    return Math.max(0, Math.min(100, uptimePercentage)); // 确保结果在 0-100 之间
+  };
 
   const uptimeRatio = {
-
-    // 7天数据是第一个（索引为0）时间段
-
-    last7Days: monitor.custom_uptime_ratio ? 
-
-      (() => {
-
-        const segments = monitor.custom_uptime_ratio?.split("-");
-
-        if (!segments || segments.length === 0) return null;
-
-        const value = parseFloat(segments[0] ?? "");
-
-        return Number.isFinite(value) ? value : null;
-
-      })() : null,
-
-    // 30天数据是第二个（索引为1）时间段
-
-    last30Days: monitor.custom_uptime_ratio ? 
-
-      (() => {
-
-        const segments = monitor.custom_uptime_ratio?.split("-");
-
-        if (!segments || segments.length <= 1) return null;
-
-        const value = parseFloat(segments[1] ?? "");
-
-        return Number.isFinite(value) ? value : null;
-
-      })() : null,
-
-    // 90天数据是第三个（索引为2）时间段
-
-    last90Days: monitor.custom_uptime_ratio ? 
-
-      (() => {
-
-        const segments = monitor.custom_uptime_ratio?.split("-");
-
-        if (!segments || segments.length <= 2) return null;
-
-        const value = parseFloat(segments[2] ?? "");
-
-        return Number.isFinite(value) ? value : null;
-
-      })() : null,
-
+    last7Days: calculateUptime(7),
+    last30Days: calculateUptime(30),
+    last90Days: calculateUptime(90),
   };
 
 
@@ -254,8 +235,6 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   // 处理每日状态数据（基于日志计算真实的每日状态）
   const dailyStatus: import("@/types/uptimerobot").DailyStatus[] = [];
   const today = dayjs(new Date().setHours(0, 0, 0, 0));
-  const createDate = monitor.create_datetime ? dayjs.unix(monitor.create_datetime) : null;
-  const now = dayjs();
   
   // 创建日期索引映射
   const timeMap = new Map<string, number>();
@@ -270,12 +249,13 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     timeMap.set(dateString, dailyStatus.length);
     
     // 检查这一天是否在监控创建之后
-    const isAfterCreate = !createDate || date.isSameOrAfter(createDate, 'day');
+    const isAfterCreate = createDate.isSameOrAfter(date, 'day');
     
     dailyStatus.push({
       date: dateUnix,
-      uptime: isAfterCreate ? 100 : -1, // 默认100%，有故障的会在后面更新为-1表示无数据
+      uptime: isAfterCreate ? 100 : -1, // 默认100%，-1表示无数据
       down: { times: 0, duration: 0 },
+      pause: { times: 0, duration: 0 },
     });
   }
   
@@ -289,7 +269,7 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   while (i < sortedLogs.length) {
     const log = sortedLogs[i];
     
-    // 如果是宕机或暂停
+    // 只处理宕机或暂停事件
     if (log.type === 1 || log.type === 99) {
       const startTime = dayjs(log.datetime);
       let endTime: dayjs.Dayjs | null = null;
@@ -305,8 +285,8 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       
       // 如果没有找到恢复日志，检查当前状态
       if (!endTime) {
-        if (monitor.status === 8 || monitor.status === 9) {
-          // 还在宕机中
+        if (monitor.status === 8 || monitor.status === 9 || monitor.status === 0) {
+          // 还在宕机或暂停中
           endTime = now;
         } else {
           // 可能数据不完整，跳过
@@ -319,10 +299,14 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       const startDateString = startTime.format("YYYYMMDD");
       const startDateIndex = timeMap.get(startDateString);
       if (startDateIndex !== undefined && dailyStatus[startDateIndex]) {
-        dailyStatus[startDateIndex].down.times += 1;
+        if (log.type === 1) {
+          dailyStatus[startDateIndex].down.times += 1;
+        } else {
+          dailyStatus[startDateIndex].pause.times += 1;
+        }
       }
       
-      // 将宕机时长分配到每一天
+      // 将时长分配到每一天
       let currentDay = startTime.startOf('day');
       
       while (currentDay.isSameOrBefore(endTime, 'day')) {
@@ -330,19 +314,22 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
         const dateIndex = timeMap.get(dateString);
         
         if (dateIndex !== undefined && dailyStatus[dateIndex]) {
-          // 计算这一天的宕机时长
-          // 开始时间：如果是故障开始当天，用实际故障开始时间；否则用当天0点
+          // 计算这一天的时长
           const dayStart = currentDay.isSame(startTime, 'day') 
             ? startTime 
             : currentDay;
           
-          // 结束时间：如果是故障结束当天，用实际结束时间；否则用第二天0点（即当天24点）
           const dayEnd = currentDay.isSame(endTime, 'day') 
             ? endTime 
-            : currentDay.endOf('day').add(1, 'second'); // 加1秒到第二天0点
+            : currentDay.endOf('day').add(1, 'second');
           
           const dayDuration = Math.max(0, dayEnd.diff(dayStart, 'second'));
-          dailyStatus[dateIndex].down.duration += dayDuration;
+
+          if (log.type === 1) {
+            dailyStatus[dateIndex].down.duration += dayDuration;
+          } else {
+            dailyStatus[dateIndex].pause.duration += dayDuration;
+          }
         }
         
         currentDay = currentDay.add(1, 'day');
@@ -352,39 +339,73 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     i++;
   }
   
-  // 根据故障时长计算实际可用率
-  dailyStatus.forEach((day, index) => {
-    if (day.uptime >= 0) { // 只处理有效数据的天
-      const date = dayjs.unix(day.date);
-      const isToday = date.isSame(today, 'day');
-
-      // 计算实际应该用来计算可用率的时间段
-      let totalSeconds: number;
-      if (isToday) {
-        // 今天：只计算已经过去的时间
-        const elapsedSeconds = now.diff(date, 'second');
-        totalSeconds = Math.max(0, Math.min(elapsedSeconds, 24 * 60 * 60));
-      } else {
-        // 过去的日子：完整的24小时
-        totalSeconds = 24 * 60 * 60;
-      }
-
-      // 重新计算可用率
-      if (day.down.duration > 0) {
-        // 确保故障时长不超过总时长
-        const actualDownDuration = Math.min(day.down.duration, totalSeconds);
-        const upSeconds = totalSeconds - actualDownDuration;
-        day.uptime = totalSeconds > 0 ? (upSeconds / totalSeconds) * 100 : 0;
-
-        // 如果故障时长等于总时长，可用率应该为0
-        if (actualDownDuration >= totalSeconds) {
-          day.uptime = 0;
-        }
-      } else {
-        // 如果没有故障记录，可用率为100%
-        day.uptime = 100;
-      }
-    }
+  // 根据故障时长计算实际可用率
+  dailyStatus.forEach((day, index) => {
+    if (day.uptime >= 0) { // 只处理有效数据的天
+      const date = dayjs.unix(day.date);
+      const isToday = date.isSame(today, 'day');
+      const dayStart = date.startOf('day');
+      const dayEnd = date.endOf('day');
+
+      // 计算实际应该用来计算可用率的时间段
+      let totalSeconds: number;
+      if (isToday) {
+        // 今天：只计算已经过去的时间
+        const elapsedSeconds = now.diff(dayStart, 'second');
+        totalSeconds = Math.max(0, Math.min(elapsedSeconds, 24 * 60 * 60));
+      } else {
+        // 过去的日子：完整的24小时
+        totalSeconds = 24 * 60 * 60;
+      }
+
+      // 检查今天是否处于暂停状态
+      // 如果监控当前是暂停状态（status === 0）且今天没有恢复记录，今天应该显示为暂停状态
+      if (isToday && monitor.status === 0) {
+        // 检查今天是否有恢复记录（type 98）
+        const hasResumeToday = logs.some(log => 
+          (log.type === 98) && // 恢复类型
+          dayjs(log.datetime).isSameOrAfter(today.startOf('day'), 'day') // 在今天或之后
+        );
+        
+        if (!hasResumeToday) {
+          // 如果监控当前是暂停状态且今天没有恢复记录，则今天应该显示为暂停状态
+          // 这意味着暂停事件从今天开始前就开始了，或者昨天的暂停没有恢复
+          // 确保今天有暂停记录，使getStatusType返回paused状态
+          if (day.pause.duration === 0) {
+            // 添加从今天00:00开始到现在的暂停时长
+            const todayStart = today.startOf('day');
+            const elapsedSeconds = now.diff(todayStart, 'second');
+            day.pause.duration = Math.max(0, Math.min(elapsedSeconds, 24 * 60 * 60)); // 限制在24小时内
+          }
+        }
+      }
+
+      // 重新计算可用率
+      if (day.down.duration > 0) {
+        const actualDownDuration = Math.min(day.down.duration, totalSeconds);
+        const upSeconds = totalSeconds - actualDownDuration;
+        day.uptime = totalSeconds > 0 ? (upSeconds / totalSeconds) * 100 : 0;
+
+        if (actualDownDuration >= totalSeconds) {
+          day.uptime = 0;
+        }
+      } else {
+        // 如果没有宕机时间，但有暂停时间，则根据暂停时间调整可用率
+        if (day.pause.duration > 0) {
+          const actualPauseDuration = Math.min(day.pause.duration, totalSeconds);
+          const effectiveTotalSeconds = totalSeconds - actualPauseDuration; // 实际有效的监控时间
+          if (effectiveTotalSeconds <= 0) {
+            // 如果整个时间段都在暂停，则显示无数据
+            day.uptime = 100; // 如果整个时间段都在暂停，则显示为暂停状态（保留暂停信息）
+          } else {
+            // 如果有暂停，但不是全天暂停，则根据有效监控时间计算
+            day.uptime = effectiveTotalSeconds > 0 ? (effectiveTotalSeconds / totalSeconds) * 100 : 0;
+          }
+        } else {
+          day.uptime = 100;
+        }
+      }
+    }
   });
 
   return {
