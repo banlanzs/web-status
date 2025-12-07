@@ -35,7 +35,7 @@ export function ScrollToTop() {
   return (
     <button
       onClick={scrollToTop}
-      className="fixed bottom-8 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition-all hover:bg-emerald-600 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+      className="fixed bottom-8 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-xl bg-white/90 text-slate-700 shadow-xl ring-1 ring-emerald-100 transition-all hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
       aria-label="返回顶部"
     >
       <svg
@@ -46,11 +46,7 @@ export function ScrollToTop() {
         stroke="currentColor"
         strokeWidth={2}
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M5 10l7-7m0 0l7 7m-7-7v18"
-        />
+        <path d="m18 15-6-6-6 6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
   );
