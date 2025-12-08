@@ -25,41 +25,53 @@ interface MonitorDetailProps {
 export function MonitorDetail({ monitor }: MonitorDetailProps) {
   const { t } = useLanguage();
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
-  
+
   // 添加 ref 来跟踪组件是否已卸载
   const isMountedRef = useRef(true);
-  
+
   // 日志分页状态
   const [visibleLogsCount, setVisibleLogsCount] = useState(5);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-  
+
   // 每次加载更多日志的数量
   const LOGS_PER_PAGE = 10;
-  
+
   // 组件卸载时设置 isMountedRef 为 false
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-  
+
   // 获取排序后的日志
   const sortedLogs = [...monitor.logs].sort((a, b) => {
-    return dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
+    const timeDiff = dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
+    if (timeDiff !== 0) return timeDiff;
+
+    // 时间相同时的排序规则 (降序/显示顺序)
+    // Paused (99) 应该在 Up (2) 之前顯示 (作为最新状态)
+    if (a.type === 99 && b.type === 2) return -1;
+    if (a.type === 2 && b.type === 99) return 1;
+
+    // Started (98) 应该在 Paused (99) 之前顯示 (作为最新状态)
+    if (a.type === 98 && b.type === 99) return -1;
+    if (a.type === 99 && b.type === 98) return 1;
+
+    return 0;
   });
-  
+
   // 当前显示的日志
   const visibleLogs = sortedLogs.slice(0, visibleLogsCount);
-  
+
   // 是否还有更多日志可以加载
   const hasMoreLogs = visibleLogsCount < sortedLogs.length;
-  
+
   // 加载更多日志的函数
   const loadMoreLogs = () => {
     if (!isMountedRef.current) return;
-    
+
     setIsLoadingLogs(true);
     // 模拟加载延迟，让用户看到加载效果
     setTimeout(() => {
@@ -139,23 +151,23 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
 
               <p className="text-sm text-slate-500">
                 {monitor.incidents.total > 0 ||
-                (monitor.downDuration.last90Days &&
-                  monitor.downDuration.last90Days > 0)
+                  (monitor.downDuration.last90Days &&
+                    monitor.downDuration.last90Days > 0)
                   ? monitor.incidents.downCount > 0 ||
                     monitor.incidents.pauseCount > 0
                     ? t("monitor.incidentsDetail", {
-                        downCount: monitor.incidents.downCount,
-                        pauseCount: monitor.incidents.pauseCount,
-                        duration: formatDuration(
-                          monitor.incidents.totalDowntimeSeconds,
-                        ),
-                      })
+                      downCount: monitor.incidents.downCount,
+                      pauseCount: monitor.incidents.pauseCount,
+                      duration: formatDuration(
+                        monitor.incidents.totalDowntimeSeconds,
+                      ),
+                    })
                     : t("monitor.incidents", {
-                        count: monitor.incidents.total,
-                        duration: formatDuration(
-                          monitor.incidents.totalDowntimeSeconds,
-                        ),
-                      })
+                      count: monitor.incidents.total,
+                      duration: formatDuration(
+                        monitor.incidents.totalDowntimeSeconds,
+                      ),
+                    })
                   : t("monitor.incidentsNone")}
               </p>
 
@@ -163,8 +175,8 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                 <span>
                   {monitor.lastCheckedAt
                     ? dayjs(monitor.lastCheckedAt).format(
-                        "YYYY-MM-DD HH:mm:ss",
-                      )
+                      "YYYY-MM-DD HH:mm:ss",
+                    )
                     : ""}
                 </span>
                 {SHOW_LINKS ? (
@@ -238,7 +250,7 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                     }
                   };
                   const typeInfo = getLogTypeLabel(log.type);
-                  
+
                   return (
                     <div
                       key={index}
@@ -270,7 +282,7 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                     </div>
                   );
                 })}
-                
+
                 {/* 加载更多按钮 */}
                 {hasMoreLogs && (
                   <div className="mt-4 flex justify-center">
