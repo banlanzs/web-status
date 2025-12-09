@@ -1,3 +1,5 @@
+![alt text|450x340](image.png)
+![alt text|450x340](image-1.png)
 ## 项目简介
 
 基于 Next.js + Tailwind CSS 打造的自定义站点状态面板，使用 UptimeRobot Read-only API 同步监控数据，支持：
