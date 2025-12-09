@@ -123,6 +123,8 @@ export interface NormalizedMonitor {
 
     totalDowntimeSeconds: number;
 
+    totalPausedSeconds: number;
+
     downCount: number;
 
     pauseCount: number;
@@ -134,6 +136,8 @@ export interface NormalizedMonitor {
     total: number;
 
     totalDowntimeSeconds: number;
+
+    totalPausedSeconds: number;
 
     downCount: number;
 

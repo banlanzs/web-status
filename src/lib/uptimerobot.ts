@@ -77,7 +77,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
   if (!logs?.length) {
     return {
       normalized: [],
-      incidents: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
+      incidents: { total: 0, totalDowntimeSeconds: 0, totalPausedSeconds: 0, downCount: 0, pauseCount: 0 },
     };
   }
 
@@ -85,6 +85,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
   const now = dayjs();
   let total = 0;
   let totalDowntimeSeconds = 0;
+  let totalPausedSeconds = 0;
   let downCount = 0;  // 宕机次数
   let pauseCount = 0; // 暂停次数
 
@@ -165,6 +166,8 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
       // 只有在 log.type 为 1 (宕机) 时才累加到 totalDowntimeSeconds
       if (log.type === 1) {
         totalDowntimeSeconds += duration;
+      } else if (log.type === 99) {
+        totalPausedSeconds += duration;
       }
 
       // 更新日志的 duration
@@ -183,7 +186,7 @@ function normalizeLogs(logs: UptimeRobotLog[] | undefined) {
     reason: log.reason,
   }));
 
-  return { normalized: cleanedNormalized, incidents: { total, totalDowntimeSeconds, downCount, pauseCount } };
+  return { normalized: cleanedNormalized, incidents: { total, totalDowntimeSeconds, totalPausedSeconds, downCount, pauseCount } };
 }
 
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
@@ -524,7 +527,7 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     logs,
     logs24h: [],
     incidents,
-    incidents24h: { total: 0, totalDowntimeSeconds: 0, downCount: 0, pauseCount: 0 },
+    incidents24h: { total: 0, totalDowntimeSeconds: 0, totalPausedSeconds: 0, downCount: 0, pauseCount: 0 },
     lastCheckedAt,
   };
 }

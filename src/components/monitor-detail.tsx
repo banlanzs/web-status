@@ -159,13 +159,13 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                       downCount: monitor.incidents.downCount,
                       pauseCount: monitor.incidents.pauseCount,
                       duration: formatDuration(
-                        monitor.incidents.totalDowntimeSeconds,
+                        monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds,
                       ),
                     })
                     : t("monitor.incidents", {
                       count: monitor.incidents.total,
                       duration: formatDuration(
-                        monitor.incidents.totalDowntimeSeconds,
+                        monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds,
                       ),
                     })
                   : t("monitor.incidentsNone")}
