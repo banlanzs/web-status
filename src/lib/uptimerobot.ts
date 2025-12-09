@@ -242,18 +242,12 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
       }
     });
 
-    // 实际监控时间 = 总时间 - 暂停时间
-    const monitoredSeconds = Math.max(0, totalSeconds - pausedDuration);
+    // 严格模式：暂停时间不计入可用时间 (分子减去暂停时间)，分母保持为总时间
+    // 这会导致可用率在暂停期间显著下降
+    const validUpSeconds = Math.max(0, totalSeconds - downDuration - pausedDuration);
+    const uptimePercentage = (validUpSeconds / totalSeconds) * 100;
 
-    // 如果实际监控时间为0（全在暂停），返回100%（避免显示0%或下降）
-    if (monitoredSeconds === 0) {
-      return 100;
-    }
-
-    // 可用率 = (监控时间 - 宕机时间) / 监控时间
-    // 注意：downDuration 也要限制在 monitoredSeconds 内，虽然逻辑上不应超过
-    const uptimePercentage = ((monitoredSeconds - Math.min(downDuration, monitoredSeconds)) / monitoredSeconds) * 100;
-    return Math.max(0, Math.min(100, uptimePercentage)); // 确保结果在 0-100 之间
+    return Math.max(0, Math.min(100, uptimePercentage));
   };
 
   const uptimeRatio = {
