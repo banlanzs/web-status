@@ -468,8 +468,12 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       if (dateStr === today && monitor.status === "down") {
         color = "bg-rose-500"; // 当前故障 - 红色
         status = "down";
+      } else if (uptime <= 30) {
+        // 严重故障（可用率低于 30%）- 红色
+        color = "bg-rose-500";
+        status = "down";
       } else {
-        // 历史故障或已恢复的故障 - 黄色
+        // 轻微故障或已恢复的故障 - 黄色
         color = "bg-amber-500";
         status = "warning";
       }
