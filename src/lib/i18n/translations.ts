@@ -3,7 +3,7 @@ export type Language = "zh" | "en";
 const baseTranslations = {
   zh: {
     app: {
-      name: "BANLAN站点监测",
+      name: process.env.NEXT_PUBLIC_SITE_NAME || "站点监测",
       taglineOperational: "站点运行正常",
       taglineIssues: "部分站点存在异常",
       taglineDown: "所有监控均不可用",
@@ -59,7 +59,15 @@ const baseTranslations = {
   },
   en: {
     app: {
-      name: "BANLAN Status",
+      name: (() => {
+        const zhName = process.env.NEXT_PUBLIC_SITE_NAME || "站点监测";
+        // 如果是默认值,使用英文翻译
+        if (zhName === "站点监测") {
+          return "Sites Status";
+        }
+        // 其他情况保持原文(用户可以自己设置英文名称)
+        return zhName;
+      })(),
       taglineOperational: "All systems operational",
       taglineIssues: "Partial service disruption",
       taglineDown: "All monitors unavailable",

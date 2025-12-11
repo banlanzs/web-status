@@ -488,7 +488,19 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
     });
 
     // 计算当天可用率
-    const daySeconds = 86400;
+    const isToday = dateStr === dayjs().format("YYYY-MM-DD");
+    let daySeconds: number;
+
+    if (isToday) {
+      // 今天:只计算已经过去的时间
+      const now = dayjs();
+      const elapsedSeconds = now.diff(date.startOf("day"), 'second');
+      daySeconds = Math.max(0, Math.min(elapsedSeconds, 86400));
+    } else {
+      // 过去的日子:完整的24小时
+      daySeconds = 86400;
+    }
+
     let uptime = 100;
 
     if (daySeconds > 0) {
