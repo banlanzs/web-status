@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { LanguageProvider } from "@/components/providers/language-provider";
+import { AuthProvider } from "@/components/providers/auth-provider";
 import { MonitorsProvider } from "@/components/providers/monitors-provider";
 import { RateLimitIndicator } from "@/components/rate-limit-indicator";
 import ErrorBoundary from "@/components/error-boundary";
@@ -41,10 +42,12 @@ export default function RootLayout({
       >
         <ErrorBoundary>
           <LanguageProvider>
-            <MonitorsProvider>
-              {children}
-              <RateLimitIndicator />
-            </MonitorsProvider>
+            <AuthProvider>
+              <MonitorsProvider>
+                {children}
+                <RateLimitIndicator />
+              </MonitorsProvider>
+            </AuthProvider>
           </LanguageProvider>
         </ErrorBoundary>
       </body>

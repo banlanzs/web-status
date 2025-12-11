@@ -47,6 +47,15 @@ const baseTranslations = {
       refresh: "立即刷新",
       refreshing: "刷新中...",
     },
+    auth: {
+      loginTitle: "管理员登录",
+      loginDescription: "请输入管理密码以访问站点链接。",
+      passwordPlaceholder: "输入密码",
+      loggingIn: "登录中...",
+      loginButton: "登录",
+      logout: "退出登录",
+      loginPrompt: "请登录后访问",
+    },
   },
   en: {
     app: {
@@ -94,6 +103,15 @@ const baseTranslations = {
       refresh: "Refresh now",
       refreshing: "Refreshing...",
     },
+    auth: {
+      loginTitle: "Admin Access",
+      loginDescription: "Enter password to access site links.",
+      passwordPlaceholder: "Password",
+      loggingIn: "Logging in...",
+      loginButton: "Login",
+      logout: "Logout",
+      loginPrompt: "Login required",
+    },
   },
 } satisfies Record<Language, Record<string, unknown>>;
 
@@ -118,11 +136,11 @@ type Paths<T, Prefix extends string = ""> = T extends
   | undefined
   ? Prefix
   : {
-      [K in Extract<keyof T, string>]: Paths<
-        T[K],
-        `${Prefix}${Prefix extends "" ? "" : "."}${K}`
-      >;
-    }[Extract<keyof T, string>];
+    [K in Extract<keyof T, string>]: Paths<
+      T[K],
+      `${Prefix}${Prefix extends "" ? "" : "."}${K}`
+    >;
+  }[Extract<keyof T, string>];
 
 export function resolveTranslation(path: TranslationKey, lang: Language) {
   const segments = path.split(".");

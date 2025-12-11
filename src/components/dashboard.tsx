@@ -13,6 +13,8 @@ import { useMonitors } from "@/components/providers/monitors-provider";
 import { LoadingOverlay } from "@/components/loading";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 import { formatNumber, formatDuration } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
+import { LoginModal } from "@/components/login-modal";
 
 const DEFAULT_REFRESH_SECONDS = Number(
   process.env.NEXT_PUBLIC_REFRESH_INTERVAL_SECONDS ?? 300,
@@ -33,7 +35,9 @@ export function Dashboard({
 }: DashboardProps) {
   const { t } = useLanguage();
   const { monitors, isLoading, error, refresh, lastUpdated } = useMonitors();
+  const { isLoggedIn, isProtectionEnabled, logout } = useAuth();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // 使用 Provider 的数据，如果 Provider 没有数据则使用初始数据
   const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
@@ -286,6 +290,27 @@ export function Dashboard({
                   />
                 </svg>
               </a>
+
+              {/* Auth Button */}
+              {isProtectionEnabled ? (
+                <button
+                  onClick={() => isLoggedIn ? logout() : setIsLoginModalOpen(true)}
+                  className={`rounded-full p-2 transition hover:bg-white/30 ${isLoggedIn ? "bg-white/20 text-white" : "bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
+                    }`}
+                  aria-label={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
+                  title={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
+                >
+                  {isLoggedIn ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              ) : null}
               <LanguageSwitcher />
             </div>
           </header>
@@ -341,7 +366,11 @@ export function Dashboard({
               </h2>
               <div className="space-y-3">
                 {displayMonitors.map((monitor) => (
-                  <MonitorListItem key={monitor.id} monitor={monitor} />
+                  <MonitorListItem
+                    key={monitor.id}
+                    monitor={monitor}
+                    onRequestLogin={() => setIsLoginModalOpen(true)}
+                  />
                 ))}
               </div>
             </section>
@@ -350,12 +379,14 @@ export function Dashboard({
       </main>
       <Footer />
       <ScrollToTop />
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 }
 
 interface MonitorListItemProps {
   monitor: NormalizedMonitor;
+  onRequestLogin: () => void;
 }
 
 const SHOW_LINKS =
@@ -366,8 +397,9 @@ const STATUS_DAYS = Number(
   process.env.NEXT_PUBLIC_STATUS_DAYS ?? 60,
 );
 
-function MonitorListItem({ monitor }: MonitorListItemProps) {
+function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
   const { t } = useLanguage();
+  const { isLoggedIn, isProtectionEnabled } = useAuth();
   const segments = STATUS_DAYS;
   const barRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -552,6 +584,10 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
             <button
               type="button"
               onClick={() => {
+                if (isProtectionEnabled && !isLoggedIn) {
+                  onRequestLogin();
+                  return;
+                }
                 window.open(
                   monitor.url.startsWith("http")
                     ? monitor.url
@@ -560,27 +596,36 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
                   "noopener,noreferrer",
                 );
               }}
-              className="inline-flex cursor-pointer items-center justify-center rounded-full bg-white p-1.5 text-emerald-600 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-700"
-              title={t("monitor.viewSite")}
-              aria-label={t("monitor.viewSite")}
+              className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition ${isProtectionEnabled && !isLoggedIn
+                ? "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                : "bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                }`}
+              title={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
+              aria-label={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-4 w-4"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                  clipRule="evenodd"
-                />
-                <path
-                  fillRule="evenodd"
-                  d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              {isProtectionEnabled && !isLoggedIn ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                    clipRule="evenodd"
+                  />
+                  <path
+                    fillRule="evenodd"
+                    d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
             </button>
           ) : null}
         </div>
@@ -591,30 +636,30 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
           <div className="overflow-hidden rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
             <div className="flex gap-0.5 sm:gap-[2px]">
               {dayData.map((day, index) => {
-              const tooltipText = day.status === "future"
-                ? "未来日期"
-                : day.status === "nodata"
-                  ? "无数据"
-                  : day.status === "paused"
-                    ? `${day.date} - 已暂停`
-                    : `${day.date} - 可用率: ${day.uptime >= 0 ? formatNumber(day.uptime) + "%" : "—"}${day.hasDownLog ? ` | 故障次数: ${day.incidentCount} | 宕机时长: ${formatDuration(day.downDuration)}` : ''}`;
+                const tooltipText = day.status === "future"
+                  ? "未来日期"
+                  : day.status === "nodata"
+                    ? "无数据"
+                    : day.status === "paused"
+                      ? `${day.date} - 已暂停`
+                      : `${day.date} - 可用率: ${day.uptime >= 0 ? formatNumber(day.uptime) + "%" : "—"}${day.hasDownLog ? ` | 故障次数: ${day.incidentCount} | 宕机时长: ${formatDuration(day.downDuration)}` : ''}`;
 
-              return (
-                <div
-                  key={`${monitor.id}-${index}`}
-                  className={`h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
-                  title={tooltipText}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    activateSegment(e.currentTarget, index);
-                  }}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
-                    activateSegment(e.currentTarget, index);
-                  }}
-                />
-              );
-            })}
+                return (
+                  <div
+                    key={`${monitor.id}-${index}`}
+                    className={`h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
+                    title={tooltipText}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      activateSegment(e.currentTarget, index);
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      activateSegment(e.currentTarget, index);
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
           {activeIndex !== null && tooltipPos !== null && (
