@@ -3,7 +3,7 @@ export type Language = "zh" | "en";
 const baseTranslations = {
   zh: {
     app: {
-      name: process.env.SITE_NAME || "站点监测",
+      name: process.env.NEXT_PUBLIC_SITE_NAME || "站点监测",
       taglineOperational: "站点运行正常",
       taglineIssues: "部分站点存在异常",
       taglineDown: "所有监控均不可用",
@@ -60,7 +60,7 @@ const baseTranslations = {
   en: {
     app: {
       name: (() => {
-        const zhName = process.env.SITE_NAME || "站点监测";
+        const zhName = process.env.NEXT_PUBLIC_SITE_NAME || "站点监测";
         // 如果是默认值,使用英文翻译
         if (zhName === "站点监测") {
           return "Sites Status";
