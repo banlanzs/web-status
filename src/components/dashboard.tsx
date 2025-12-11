@@ -2,7 +2,7 @@
 
 import dayjs from "dayjs";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Footer } from "@/components/footer";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -369,6 +369,23 @@ const STATUS_DAYS = Number(
 function MonitorListItem({ monitor }: MonitorListItemProps) {
   const { t } = useLanguage();
   const segments = STATUS_DAYS;
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<number | null>(null);
+  const [tooltipText, setTooltipText] = useState<string>("");
+
+  const activateSegment = (el: HTMLDivElement, index: number) => {
+    const containerRect = barRef.current?.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    if (!containerRect) return;
+    if (activeIndex === index) {
+      setActiveIndex(null);
+      return;
+    }
+    setActiveIndex(index);
+    setTooltipPos(rect.left - containerRect.left + rect.width / 2);
+    setTooltipText(el.getAttribute("title") || "");
+  };
 
   // 计算监控创建日期（如果有）
   const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : null;
@@ -567,7 +584,7 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1 overflow-visible rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
+        <div ref={barRef} className="relative flex-1 overflow-hidden rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3" onClick={() => setActiveIndex(null)}>
           <div className="flex gap-0.5 sm:gap-[2px]">
             {dayData.map((day, index) => {
               const tooltipText = day.status === "future"
@@ -583,10 +600,28 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
                   key={`${monitor.id}-${index}`}
                   className={`h-6 min-w-[2px] sm:min-w-[3px] flex-1 rounded-sm ${day.color} cursor-pointer transition-opacity hover:opacity-80`}
                   title={tooltipText}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    activateSegment(e.currentTarget, index);
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    activateSegment(e.currentTarget, index);
+                  }}
                 />
               );
             })}
           </div>
+          {activeIndex !== null && tooltipPos !== null && (
+            <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 -translate-x-1/2" style={{ left: tooltipPos }}>
+              <div className="whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs text-white shadow-xl">
+                {tooltipText}
+              </div>
+              <div className="absolute left-1/2 top-full -translate-x-1/2 -mt-px">
+                <div className="h-0 w-0 border-l-[5px] border-r-[5px] border-t-[5px] border-transparent border-t-slate-900" />
+              </div>
+            </div>
+          )}
         </div>
         <span className="whitespace-nowrap text-xs text-slate-500 sm:text-right">
           {monitor.lastCheckedAt
