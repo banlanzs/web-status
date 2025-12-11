@@ -382,8 +382,11 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       setActiveIndex(null);
       return;
     }
+    const center = rect.left - containerRect.left + rect.width / 2;
+    const min = 8;
+    const max = Math.max(min, containerRect.width - 8);
     setActiveIndex(index);
-    setTooltipPos(rect.left - containerRect.left + rect.width / 2);
+    setTooltipPos(Math.max(min, Math.min(max, center)));
     setTooltipText(el.getAttribute("title") || "");
   };
 
@@ -584,9 +587,10 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div ref={barRef} className="relative flex-1 overflow-hidden rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3" onClick={() => setActiveIndex(null)}>
-          <div className="flex gap-0.5 sm:gap-[2px]">
-            {dayData.map((day, index) => {
+        <div ref={barRef} className="relative flex-1" onClick={() => setActiveIndex(null)}>
+          <div className="overflow-hidden rounded-lg bg-slate-200/80 px-2 py-2 sm:px-3">
+            <div className="flex gap-0.5 sm:gap-[2px]">
+              {dayData.map((day, index) => {
               const tooltipText = day.status === "future"
                 ? "未来日期"
                 : day.status === "nodata"
@@ -611,6 +615,7 @@ function MonitorListItem({ monitor }: MonitorListItemProps) {
                 />
               );
             })}
+            </div>
           </div>
           {activeIndex !== null && tooltipPos !== null && (
             <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 -translate-x-1/2" style={{ left: tooltipPos }}>
