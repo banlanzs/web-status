@@ -9,7 +9,9 @@ import { useState, useEffect, useRef, Suspense } from "react";
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
 
+import { LoginModal } from "@/components/login-modal";
 import { StatusBadge } from "@/components/status-badge";
+import { useAuth } from "@/components/providers/auth-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 import { cn, formatDuration, formatNumber } from "@/lib/utils";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
@@ -24,7 +26,9 @@ interface MonitorDetailProps {
 
 export function MonitorDetail({ monitor }: MonitorDetailProps) {
   const { t } = useLanguage();
+  const { isLoggedIn, isProtectionEnabled } = useAuth();
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // 添加 ref 来跟踪组件是否已卸载
   const isMountedRef = useRef(true);
@@ -84,6 +88,17 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
 
   // 计算监控创建日期（如果有）
   const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : null;
+  const monitorLink = monitor.url.startsWith("http")
+    ? monitor.url
+    : `https://${monitor.url}`;
+
+  const handleOpenMonitorLink = () => {
+    if (isProtectionEnabled && !isLoggedIn) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    window.open(monitorLink, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <Suspense fallback={
@@ -180,19 +195,17 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                     : ""}
                 </span>
                 {SHOW_LINKS ? (
-                  <Link
-                    href={
-                      monitor.url.startsWith("http")
-                        ? monitor.url
-                        : `https://${monitor.url}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={handleOpenMonitorLink}
                     className={cn(
-                      "inline-flex items-center justify-center rounded-full bg-emerald-50 p-1.5 text-emerald-600 transition hover:bg-emerald-100 hover:text-emerald-700",
+                      "inline-flex items-center justify-center rounded-full p-1.5 transition",
+                      isProtectionEnabled && !isLoggedIn
+                        ? "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                        : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700",
                     )}
-                    title={t("monitor.viewSite")}
-                    aria-label={t("monitor.viewSite")}
+                    title={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
+                    aria-label={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -211,7 +224,7 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                         clipRule="evenodd"
                       />
                     </svg>
-                  </Link>
+                  </button>
                 ) : (
                   <span className="text-slate-400">
                     {t("monitor.linkDisabled")}
@@ -320,6 +333,12 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
           </section>
         </div>
       </div>
+      {isProtectionEnabled ? (
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+        />
+      ) : null}
     </Suspense>
   );
 }
