@@ -10,7 +10,7 @@ const baseTranslations = {
       taglineUnknown: "监控状态未知",
       lastUpdated: "更新于 {{time}}",
       nextRefresh: "将于 {{seconds}} 秒后刷新",
-      monitorsSummary: "{{total}} 个监控 · {{up}} 正常 · {{down}} 异常",
+      monitorsSummary: "{{total}} 个监控 · {{up}} 正常 · {{down}} 异常 · {{paused}} 暂停",
       empty: "暂无监控数据",
     },
     monitor: {
@@ -74,7 +74,7 @@ const baseTranslations = {
       taglineUnknown: "Monitor status unknown",
       lastUpdated: "Updated {{time}}",
       nextRefresh: "Refresh in {{seconds}}s",
-      monitorsSummary: "{{total}} monitors ({{up}} up, {{down}} down)",
+      monitorsSummary: "{{total}} monitors ({{up}} up, {{down}} down, {{paused}} paused)",
       empty: "No monitors available",
     },
     monitor: {
@@ -177,4 +177,3 @@ export function formatTranslation(
     return String(values[key]);
   });
 }
-

@@ -339,6 +339,7 @@ export function Dashboard({
                 total: summary.total,
                 up: summary.up,
                 down: summary.down,
+                paused: summary.paused,
               })}
             </span>
           </div>
