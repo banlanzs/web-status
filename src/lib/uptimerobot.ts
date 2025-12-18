@@ -286,7 +286,7 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
     timeMap.set(dateString, dailyStatus.length);
 
     // 检查这一天是否在监控创建之后
-    const isAfterCreate = createDate.isSameOrAfter(date, 'day');
+    const isAfterCreate = date.isSameOrAfter(createDate, "day");
 
     dailyStatus.push({
       date: dateUnix,
@@ -300,6 +300,10 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
   const sortedLogs = [...logs].sort((a, b) =>
     dayjs(a.datetime).valueOf() - dayjs(b.datetime).valueOf()
   );
+
+  // 获取最近一次状态变更日志，作为推断暂停状态的起点
+  const lastLog = sortedLogs.length > 0 ? sortedLogs[sortedLogs.length - 1] : null;
+  const lastLogTime = lastLog ? dayjs(lastLog.datetime) : createDate;
 
   // 成对处理日志：down/pause -> up
   let i = 0;
@@ -414,46 +418,24 @@ function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
 
 
 
-      // 检查今天是否处于暂停状态
+      // 检查当前是否处于暂停状态
+      // 如果监控当前是暂停状态（status === 0），且该日期在最后一条日志之后
+      if (monitor.status === 0 && date.isAfter(lastLogTime, "day")) {
+        // 检查这一天是否已经有了足够的暂停时长记录
+        const dayStart = date.startOf("day");
+        const dayEnd = isToday ? now : date.endOf("day");
+        const totalPossibleSeconds = Math.max(0, dayEnd.diff(dayStart, "second"));
 
-      // 如果监控当前是暂停状态（status === 0）且今天没有恢复记录，今天应该显示为暂停状态
+        if (day.pause.duration < totalPossibleSeconds * 0.8) {
+          // 如果记录不全（可能日志记录滞后或被挤出），补全该时段的暂停时长
+          const effectiveStart = lastLogTime.isAfter(dayStart) ? lastLogTime : dayStart;
+          const overlapDuration = Math.max(0, dayEnd.diff(effectiveStart, "second"));
 
-      if (isToday && monitor.status === 0) {
-
-        // 检查今天是否有恢复记录（type 98）
-
-        const hasResumeToday = logs.some(log =>
-
-          (log.type === 98) && // 恢复类型
-
-          dayjs(log.datetime).isSameOrAfter(today.startOf('day'), 'day') // 在今天或之后
-
-        );
-
-
-
-        if (!hasResumeToday) {
-
-          // 如果监控当前是暂停状态且今天没有恢复记录，则今天应该显示为暂停状态
-
-          // 这意味着暂停事件从今天开始前就开始了，或者昨天的暂停没有恢复
-
-          // 确保今天有暂停记录，使getStatusType返回paused状态
-
-          if (day.pause.duration === 0) {
-
-            // 添加从今天00:00开始到现在的暂停时长
-
-            const todayStart = today.startOf('day');
-
-            const elapsedSeconds = now.diff(todayStart, 'second');
-
-            day.pause.duration = Math.max(0, Math.min(elapsedSeconds, 24 * 60 * 60)); // 限制在24小时内
-
+          // 仅在最后一条日志之后的部分标记为暂停，保护之前的历史记录
+          if (overlapDuration > day.pause.duration) {
+            day.pause.duration = overlapDuration;
           }
-
         }
-
       }
 
 

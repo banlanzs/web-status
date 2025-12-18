@@ -1,6 +1,8 @@
 "use client";
 
 import dayjs from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+dayjs.extend(isSameOrAfter);
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -424,7 +426,11 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
   };
 
   // 计算监控创建日期（如果有）
-  const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : null;
+  const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : dayjs();
+
+  // 获取最近一次状态变更日志，作为推断暂停状态的起点
+  const lastLog = [...monitor.logs].sort((a, b) => dayjs(a.datetime).valueOf() - dayjs(b.datetime).valueOf()).pop();
+  const lastLogTime = lastLog ? dayjs(lastLog.datetime) : createDate;
 
   // 为每一天构建状态数据
   const dayData = Array.from({ length: segments }, (_, index) => {
@@ -432,8 +438,8 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
     const dateStr = date.format("YYYY-MM-DD");
     const today = dayjs().format("YYYY-MM-DD");
 
-    // 检查这一天是否在监控创建之后（不包括创建当天，只包括创建之后的日期）
-    const isAfterCreate = !createDate || date.isAfter(createDate);
+    // 检查这一天是否在监控创建之后
+    const isAfterCreate = date.isSameOrAfter(createDate, "day");
 
     // 如果不在创建日期之后，标记为无数据
     if (!isAfterCreate) {
@@ -548,8 +554,8 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
       status = "paused";
     }
 
-    // 如果监控当前是暂停状态且是今天，强制显示为暂停
-    if (monitor.status === "paused" && dateStr === today) {
+    // 如果监控当前是暂停状态（status === "paused"），且该日期在最后一条日志（或创建日期）之后
+    if (monitor.status === "paused" && date.isAfter(lastLogTime, "day")) {
       color = "bg-slate-400";
       status = "paused";
     }
