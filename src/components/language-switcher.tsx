@@ -19,11 +19,11 @@ export function LanguageSwitcher() {
     <button
       type="button"
       onClick={handleToggle}
-      className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-2 text-sm font-medium text-white shadow-soft backdrop-blur transition hover:bg-white/30"
+      className="flex items-center gap-1 sm:gap-2 rounded-full bg-white/20 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white shadow-soft backdrop-blur transition hover:bg-white/30"
       title={`Switch to ${nextLang?.label}`}
     >
       <svg
-        className="h-4 w-4"
+        className="h-3 w-3 sm:h-4 sm:w-4"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -36,7 +36,7 @@ export function LanguageSwitcher() {
           d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
         />
       </svg>
-      <span>{currentLang?.label}</span>
+      <span className="whitespace-nowrap">{currentLang?.label}</span>
     </button>
   );
 }

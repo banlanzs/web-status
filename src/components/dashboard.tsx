@@ -244,103 +244,111 @@ export function Dashboard({
             </svg>
           </div>
         </div>
-        <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-6">
-          <header className="flex items-center justify-between">
-            <div>
+        <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 sm:gap-6 sm:px-6">
+          <header className="flex items-start justify-between gap-4 sm:items-center">
+            <div className="flex-1 min-w-0">
               <p className="text-sm uppercase tracking-widest text-white/90 drop-shadow-sm">
                 {t("app.name")}
               </p>
-              <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl drop-shadow-md">
+              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl md:text-4xl drop-shadow-md break-words">
                 {summaryTagline}
               </h1>
             </div>
-            <div className="flex items-center gap-3">
-              {refreshInterval > 0 ? (
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
+              {/* 移动端优先显示的按钮组 */}
+              <div className="flex items-center gap-1 sm:gap-2">
+                {refreshInterval > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleForceRefresh}
+                    className="rounded-full bg-white/20 p-1.5 sm:p-2 text-white transition hover:bg-white/30 disabled:opacity-50"
+                    disabled={isLoading}
+                    aria-label={isLoading ? t("controls.refreshing") : t("controls.refresh")}
+                    title={isLoading ? t("controls.refreshing") : t("controls.refresh")}
+                  >
+                    <svg
+                      className={`h-4 w-4 sm:h-5 sm:w-5 ${isLoading ? "animate-spin" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </button>
+                ) : null}
+                
+                {/* 分组切换按钮 */}
                 <button
                   type="button"
-                  onClick={handleForceRefresh}
-                  className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30 disabled:opacity-50"
-                  disabled={isLoading}
-                  aria-label={isLoading ? t("controls.refreshing") : t("controls.refresh")}
-                  title={isLoading ? t("controls.refreshing") : t("controls.refresh")}
+                  onClick={() => setShowGrouped(!showGrouped)}
+                  className="rounded-full bg-white/20 p-1.5 sm:p-2 text-white transition hover:bg-white/30"
+                  aria-label={showGrouped ? "显示列表视图" : "显示分组视图"}
+                  title={showGrouped ? "显示列表视图" : "显示分组视图"}
+                >
+                  {showGrouped ? (
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5m14 14H5" />
+                    </svg>
+                  )}
+                </button>
+                
+                <LanguageSwitcher />
+              </div>
+
+              {/* 桌面端显示的额外按钮 */}
+              <div className="hidden md:flex items-center gap-2 lg:gap-3">
+                <a
+                  href={process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/banlanzs/web-status"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30"
+                  aria-label="GitHub"
                 >
                   <svg
-                    className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+                    className="h-5 w-5"
+                    fill="currentColor"
                     viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      fillRule="evenodd"
+                      d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"
+                      clipRule="evenodd"
                     />
                   </svg>
-                </button>
-              ) : null}
-              
-              {/* 分组切换按钮 */}
-              <button
-                type="button"
-                onClick={() => setShowGrouped(!showGrouped)}
-                className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30"
-                aria-label={showGrouped ? "显示列表视图" : "显示分组视图"}
-                title={showGrouped ? "显示列表视图" : "显示分组视图"}
-              >
-                {showGrouped ? (
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5m14 14H5" />
-                  </svg>
-                )}
-              </button>
-              <a
-                href={process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/banlanzs/web-status"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30"
-                aria-label="GitHub"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </a>
+                </a>
 
-              {/* Auth Button */}
-              {isProtectionEnabled ? (
-                <button
-                  onClick={() => isLoggedIn ? logout() : setIsLoginModalOpen(true)}
-                  className={`rounded-full p-2 transition hover:bg-white/30 ${isLoggedIn ? "bg-white/20 text-white" : "bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
-                    }`}
-                  aria-label={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
-                  title={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
-                >
-                  {isLoggedIn ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
-              ) : null}
-              <LanguageSwitcher />
+                {/* Auth Button */}
+                {isProtectionEnabled ? (
+                  <button
+                    onClick={() => isLoggedIn ? logout() : setIsLoginModalOpen(true)}
+                    className={`rounded-full p-2 transition hover:bg-white/30 ${isLoggedIn ? "bg-white/20 text-white" : "bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
+                      }`}
+                    aria-label={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
+                    title={isLoggedIn ? t("auth.logout") : t("auth.loginTitle")}
+                  >
+                    {isLoggedIn ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                ) : null}
+              </div>
             </div>
           </header>
 
