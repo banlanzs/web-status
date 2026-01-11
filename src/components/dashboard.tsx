@@ -19,6 +19,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { LoginModal } from "@/components/login-modal";
 import { MonitorGroupComponent } from "@/components/monitor-group";
 import { groupMonitors } from "@/config/monitor-groups";
+import { GroupManager } from "@/components/group-manager";
 
 const DEFAULT_REFRESH_SECONDS = Number(
   process.env.NEXT_PUBLIC_REFRESH_INTERVAL_SECONDS ?? 300,
@@ -43,6 +44,7 @@ export function Dashboard({
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [showGrouped, setShowGrouped] = useState(true); // 新增：控制分组显示
+  const [showGroupManager, setShowGroupManager] = useState(false); // 新增：控制分组管理器
 
   // 使用 Provider 的数据，如果 Provider 没有数据则使用初始数据
   const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
@@ -403,9 +405,19 @@ export function Dashboard({
               {/* 显示未分组的监控 */}
               {ungrouped.length > 0 && (
                 <section className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft">
-                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
-                    其他服务
-                  </h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
+                      其他服务 ({ungrouped.length})
+                    </h2>
+                    {ungrouped.length > 0 && (
+                      <button
+                        onClick={() => setShowGroupManager(true)}
+                        className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full hover:bg-emerald-200 transition"
+                      >
+                        分配到分组
+                      </button>
+                    )}
+                  </div>
                   <div className="space-y-3">
                     {ungrouped.map((monitor) => (
                       <MonitorListItem
@@ -440,6 +452,12 @@ export function Dashboard({
       <Footer />
       <ScrollToTop />
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      {showGroupManager && (
+        <GroupManager
+          ungroupedMonitors={ungrouped}
+          onClose={() => setShowGroupManager(false)}
+        />
+      )}
     </div>
   );
 }

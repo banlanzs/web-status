@@ -126,9 +126,103 @@ npm run list:monitors
 - 如果所有监控都处于暂停状态，分组状态显示为"暂停"  
 - 否则分组状态显示为"正常"
 
-### 自动处理未分组监控
+## 灵活的自动分组系统
 
-系统会自动检测没有分配到任何分组的监控，并将它们显示在"其他服务"部分。
+### 三种匹配方式
+
+新的分组系统支持三种智能匹配方式，大大提高了分组的准确性：
+
+1. **关键词匹配**: 检查监控名称中是否包含指定关键词
+2. **域名匹配**: 检查监控URL中是否包含指定域名
+3. **正则模式匹配**: 使用正则表达式进行更灵活的匹配
+
+### 环境变量配置
+
+在 `.env.local` 文件中配置分组规则：
+
+```env
+NEXT_PUBLIC_AUTO_GROUPING_RULES='{
+  "blogs": {
+    "keywords": ["博客", "blog", "hexo", "astro", "wordpress", "gatsby"],
+    "domains": ["vercel.app", "github.io", "netlify.app", "pages.dev"],
+    "patterns": ["blog", "diary", "journal", "personal"]
+  },
+  "tools": {
+    "keywords": ["图床", "comment", "panel", "api", "service", "tool"],
+    "domains": ["herokuapp.com", "railway.app", "render.com"],
+    "patterns": ["admin", "manage", "dashboard", "console"]
+  }
+}'
+
+# 设置默认分组（可选）
+NEXT_PUBLIC_DEFAULT_GROUP_ID=tools
+```
+
+### 匹配示例
+
+以下是一些匹配示例：
+
+**博客站点分组**:
+- `hexo-blog (ae.kg)` → 关键词匹配 "hexo"
+- `My Personal Blog` → 模式匹配 "blog"
+- `https://myblog.vercel.app` → 域名匹配 "vercel.app"
+
+**工具服务分组**:
+- `图床服务` → 关键词匹配 "图床"
+- `Admin Panel` → 模式匹配 "admin"
+- `https://myapi.herokuapp.com` → 域名匹配 "herokuapp.com"
+
+### 默认分组
+
+如果监控无法匹配任何规则，可以设置默认分组：
+
+```env
+NEXT_PUBLIC_DEFAULT_GROUP_ID=tools
+```
+
+这样所有无法分类的监控都会自动分配到"工具服务"分组。
+
+### 实时生效
+
+环境变量的修改在重新部署后立即生效，无需修改代码。这意味着：
+
+1. 在 Vercel 等平台上，你可以直接在环境变量设置中修改分组规则
+2. 新添加的监控会根据最新的规则自动分组
+3. 不需要重新编写代码或手动配置
+
+### 测试分组规则
+
+你可以使用内置的测试脚本来验证分组规则是否按预期工作：
+
+```bash
+npm run test:grouping
+```
+
+这个脚本会测试各种监控名称和URL组合，确保分组规则正确匹配。
+
+### 添加新的分组规则
+
+当你需要为新类型的监控添加分组规则时，只需要：
+
+1. 在 `.env.local` 中更新 `NEXT_PUBLIC_AUTO_GROUPING_RULES`
+2. 运行 `npm run test:grouping` 验证规则
+3. 重新部署项目
+
+例如，添加数据库分组：
+
+```env
+NEXT_PUBLIC_AUTO_GROUPING_RULES='{
+  "blogs": { ... },
+  "tools": { ... },
+  "databases": {
+    "keywords": ["database", "数据库", "mysql", "postgres", "mongodb", "redis"],
+    "domains": ["planetscale.com", "supabase.com", "mongodb.com"],
+    "patterns": ["db", "database", "sql"]
+  }
+}'
+```
+
+记得同时在 `src/config/monitor-groups.ts` 中添加对应的分组定义。
 
 ### 数据文件管理
 
