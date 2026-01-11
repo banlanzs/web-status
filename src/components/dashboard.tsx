@@ -17,6 +17,8 @@ import type { NormalizedMonitor } from "@/types/uptimerobot";
 import { formatNumber, formatDuration } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { LoginModal } from "@/components/login-modal";
+import { MonitorGroupComponent } from "@/components/monitor-group";
+import { groupMonitors } from "@/config/monitor-groups";
 
 const DEFAULT_REFRESH_SECONDS = Number(
   process.env.NEXT_PUBLIC_REFRESH_INTERVAL_SECONDS ?? 300,
@@ -40,10 +42,14 @@ export function Dashboard({
   const { isLoggedIn, isProtectionEnabled, logout } = useAuth();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [showGrouped, setShowGrouped] = useState(true); // 新增：控制分组显示
 
   // 使用 Provider 的数据，如果 Provider 没有数据则使用初始数据
   const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
   const displayError = error || initialError;
+
+  // 分组数据
+  const { groups, ungrouped } = groupMonitors(displayMonitors);
 
   // 当 lastUpdated 变化时，重置倒计时（包括自动刷新和手动刷新）
   useEffect(() => {
@@ -272,6 +278,25 @@ export function Dashboard({
                   </svg>
                 </button>
               ) : null}
+              
+              {/* 分组切换按钮 */}
+              <button
+                type="button"
+                onClick={() => setShowGrouped(!showGrouped)}
+                className="rounded-full bg-white/20 p-2 text-white transition hover:bg-white/30"
+                aria-label={showGrouped ? "显示列表视图" : "显示分组视图"}
+                title={showGrouped ? "显示列表视图" : "显示分组视图"}
+              >
+                {showGrouped ? (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5m14 14H5" />
+                  </svg>
+                )}
+              </button>
               <a
                 href={process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/banlanzs/web-status"}
                 target="_blank"
@@ -362,7 +387,39 @@ export function Dashboard({
             <div className="rounded-3xl bg-white/70 p-12 text-center text-slate-500 shadow-soft">
               {t("app.empty")}
             </div>
+          ) : showGrouped ? (
+            // 分组视图
+            <div className="space-y-6">
+              {/* 显示分组 */}
+              {groups.map(({ group, monitors: groupMonitors }) => (
+                <MonitorGroupComponent
+                  key={group.id}
+                  group={group}
+                  monitors={groupMonitors}
+                  onRequestLogin={() => setIsLoginModalOpen(true)}
+                />
+              ))}
+              
+              {/* 显示未分组的监控 */}
+              {ungrouped.length > 0 && (
+                <section className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft">
+                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
+                    其他服务
+                  </h2>
+                  <div className="space-y-3">
+                    {ungrouped.map((monitor) => (
+                      <MonitorListItem
+                        key={monitor.id}
+                        monitor={monitor}
+                        onRequestLogin={() => setIsLoginModalOpen(true)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
           ) : (
+            // 列表视图（原来的显示方式）
             <section className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft">
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
                 Services

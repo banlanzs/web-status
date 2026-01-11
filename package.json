@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "print:uptimerobot-sample": "node ./scripts/print_uptimerobot_sample.js"
+    "print:uptimerobot-sample": "node ./scripts/print_uptimerobot_sample.js",
+    "list:monitors": "node ./scripts/list-monitors.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",
