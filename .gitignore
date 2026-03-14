@@ -45,3 +45,6 @@ data.json
 data-v2.json
 parameters.txt
 monitor-settings.json
+
+#
+.claude/

@@ -1,3 +1,4 @@
+// Monitor grouping configuration
 // 监控分组配置
 export interface MonitorGroup {
   id: string;
@@ -7,6 +8,14 @@ export interface MonitorGroup {
   icon?: string;
   monitors: number[]; // UptimeRobot 监控 ID 数组
 }
+
+export const IS_GROUPING_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_GROUPING !== "false" &&
+  process.env.NEXT_PUBLIC_ENABLE_GROUPING !== "0";
+
+export const DEFAULT_SHOW_GROUPED =
+  process.env.NEXT_PUBLIC_DEFAULT_SHOW_GROUPED !== "false" &&
+  process.env.NEXT_PUBLIC_DEFAULT_SHOW_GROUPED !== "0";
 
 // 分组配置 - 基于智能分析的建议配置
 export const MONITOR_GROUPS: MonitorGroup[] = [
@@ -80,6 +89,8 @@ interface GroupingRule {
   keywords: string[];
   domains: string[];
   patterns: string[];
+  tlds?: string[];
+  paths?: string[];
 }
 
 // 从环境变量读取分组规则
@@ -100,22 +111,30 @@ function getGroupingRules(): Record<string, GroupingRule> {
     blogs: {
       keywords: ["博客", "blog", "hexo", "astro"],
       domains: ["vercel.app", "github.io", "netlify.app"],
-      patterns: ["blog", "diary"]
+      patterns: ["blog", "diary"],
+      tlds: [],
+      paths: []
     },
     tools: {
       keywords: ["图床", "comment", "panel", "阅后即焚", "tool"],
       domains: ["herokuapp.com"],
-      patterns: ["admin", "manage"]
+      patterns: ["admin", "manage"],
+      tlds: [],
+      paths: []
     },
     monitoring: {
       keywords: ["uptime", "监控", "broadcast", "kuma", "monitor"],
       domains: [],
-      patterns: ["status", "health", "monitor"]
+      patterns: ["status", "health", "monitor"],
+      tlds: [],
+      paths: []
     },
     navigation: {
       keywords: ["导航", "site", "nav", "斑斓"],
       domains: [],
-      patterns: ["nav", "portal", "index"]
+      patterns: ["nav", "portal", "index"],
+      tlds: [],
+      paths: []
     }
   };
 }
@@ -128,42 +147,100 @@ function getDefaultGroupId(): string | null {
   return null;
 }
 
+interface ParsedUrlParts {
+  hostname: string;
+  path: string;
+  tld: string;
+  domain: string;
+  subdomain: string;
+}
+
+function parseUrlParts(url?: string): ParsedUrlParts | null {
+  if (!url) return null;
+  try {
+    const normalized = url.startsWith("http") ? url : `https://${url}`;
+    const urlObj = new URL(normalized);
+    const hostname = urlObj.hostname.toLowerCase();
+    const path = (urlObj.pathname || "/").toLowerCase();
+    const parts = hostname.split(".").filter(Boolean);
+    const tld = parts.length >= 2 ? parts[parts.length - 1] : "";
+    const domain = parts.length >= 2 ? parts.slice(-2).join(".") : hostname;
+    const subdomain = parts.length > 2 ? parts.slice(0, -2).join(".") : "";
+    return { hostname, path, tld, domain, subdomain };
+  } catch {
+    return null;
+  }
+}
+
+const SCORE_WEIGHTS = {
+  keyword: 10,
+  domain: 20,
+  tld: 15,
+  path: 15,
+  pattern: 10
+};
+
+const MIN_SCORE = 10;
+
 // 基于监控名称和URL的智能分组规则
 export function getAutoGroupForMonitor(monitorName: string, monitorUrl?: string): MonitorGroup | null {
   const name = monitorName.toLowerCase();
   const url = (monitorUrl || '').toLowerCase();
+  const urlParts = parseUrlParts(monitorUrl);
   const rules = getGroupingRules();
-  
+
+  let bestGroupId: string | null = null;
+  let bestScore = 0;
+
   // 遍历所有分组规则
   for (const [groupId, rule] of Object.entries(rules)) {
-    // 检查关键词匹配
-    const keywordMatch = rule.keywords.some(keyword => 
+    let score = 0;
+
+    const keywordMatch = rule.keywords?.some(keyword =>
       name.includes(keyword.toLowerCase())
     );
-    
-    // 检查域名匹配
-    const domainMatch = rule.domains.some(domain => 
-      url.includes(domain.toLowerCase())
+    if (keywordMatch) score += SCORE_WEIGHTS.keyword;
+
+    const domainMatch = urlParts && rule.domains?.some(domain =>
+      urlParts.hostname.includes(domain.toLowerCase())
     );
-    
-    // 检查模式匹配（更灵活的匹配）
-    const patternMatch = rule.patterns.some(pattern => {
+    if (domainMatch) score += SCORE_WEIGHTS.domain;
+
+    const tldMatch = urlParts && rule.tlds?.some(tld =>
+      urlParts.tld === tld.toLowerCase()
+    );
+    if (tldMatch) score += SCORE_WEIGHTS.tld;
+
+    const pathMatch = urlParts && rule.paths?.some(path =>
+      urlParts.path.includes(path.toLowerCase())
+    );
+    if (pathMatch) score += SCORE_WEIGHTS.path;
+
+    const patternMatch = rule.patterns?.some(pattern => {
       const regex = new RegExp(pattern.toLowerCase(), 'i');
       return regex.test(name) || regex.test(url);
     });
-    
-    // 如果任何一种匹配成功，返回对应分组
-    if (keywordMatch || domainMatch || patternMatch) {
-      return MONITOR_GROUPS.find(g => g.id === groupId) || null;
+    if (patternMatch) score += SCORE_WEIGHTS.pattern;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestGroupId = groupId;
+    } else if (score === bestScore && score >= MIN_SCORE && bestGroupId) {
+      // Tie-breaker: prefer lexicographically smaller id for determinism
+      if (groupId < bestGroupId) bestGroupId = groupId;
     }
   }
-  
+
+  if (bestGroupId && bestScore >= MIN_SCORE) {
+    return MONITOR_GROUPS.find(g => g.id === bestGroupId) || null;
+  }
+
   // 如果没有匹配到任何规则，尝试使用默认分组
   const defaultGroupId = getDefaultGroupId();
   if (defaultGroupId) {
     return MONITOR_GROUPS.find(g => g.id === defaultGroupId) || null;
   }
-  
+
   return null;
 }
 
@@ -172,6 +249,10 @@ export function groupMonitors<T extends { id: number; name: string; url?: string
   groups: Array<{ group: MonitorGroup; monitors: T[] }>;
   ungrouped: T[];
 } {
+  if (!IS_GROUPING_ENABLED) {
+    return { groups: [], ungrouped: monitors };
+  }
+
   const result = {
     groups: [] as Array<{ group: MonitorGroup; monitors: T[] }>,
     ungrouped: [] as T[]

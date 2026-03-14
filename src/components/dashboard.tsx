@@ -18,7 +18,7 @@ import { formatNumber, formatDuration } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { LoginModal } from "@/components/login-modal";
 import { MonitorGroupComponent } from "@/components/monitor-group";
-import { groupMonitors } from "@/config/monitor-groups";
+import { DEFAULT_SHOW_GROUPED, IS_GROUPING_ENABLED, groupMonitors } from "@/config/monitor-groups";
 import { GroupManager } from "@/components/group-manager";
 
 const DEFAULT_REFRESH_SECONDS = Number(
@@ -43,8 +43,32 @@ export function Dashboard({
   const { isLoggedIn, isProtectionEnabled, logout } = useAuth();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [showGrouped, setShowGrouped] = useState(true); // 新增：控制分组显示
-  const [showGroupManager, setShowGroupManager] = useState(false); // 新增：控制分组管理器
+  const [showGrouped, setShowGrouped] = useState(() => {
+    if (!IS_GROUPING_ENABLED) return false;
+    return DEFAULT_SHOW_GROUPED;
+  });
+  const [showGroupManager, setShowGroupManager] = useState(false);
+
+  // 客户端挂载后从 localStorage 读取偏好
+  useEffect(() => {
+    if (!IS_GROUPING_ENABLED) return;
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("pref_show_grouped");
+      if (saved !== null) {
+        setShowGrouped(JSON.parse(saved));
+      }
+    } catch {}
+  }, []);
+
+  // 持久化用户偏好
+  useEffect(() => {
+    if (!IS_GROUPING_ENABLED) return;
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem("pref_show_grouped", JSON.stringify(showGrouped));
+    } catch {}
+  }, [showGrouped]);
 
   // 使用 Provider 的数据，如果 Provider 没有数据则使用初始数据
   const displayMonitors = monitors.length > 0 ? monitors : initialMonitors;
@@ -52,6 +76,7 @@ export function Dashboard({
 
   // 分组数据
   const { groups, ungrouped } = groupMonitors(displayMonitors);
+  const effectiveShowGrouped = IS_GROUPING_ENABLED && showGrouped;
 
   // 当 lastUpdated 变化时，重置倒计时（包括自动刷新和手动刷新）
   useEffect(() => {
@@ -286,23 +311,25 @@ export function Dashboard({
                 ) : null}
                 
                 {/* 分组切换按钮 */}
-                <button
-                  type="button"
-                  onClick={() => setShowGrouped(!showGrouped)}
-                  className="rounded-full bg-white/20 p-1.5 sm:p-2 text-white transition hover:bg-white/30"
-                  aria-label={showGrouped ? "显示列表视图" : "显示分组视图"}
-                  title={showGrouped ? "显示列表视图" : "显示分组视图"}
-                >
-                  {showGrouped ? (
-                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5m14 14H5" />
-                    </svg>
-                  )}
-                </button>
+                {IS_GROUPING_ENABLED && (
+                  <button
+                    type="button"
+                    onClick={() => setShowGrouped(!showGrouped)}
+                    className="rounded-full bg-white/20 p-1.5 sm:p-2 text-white transition hover:bg-white/30"
+                    aria-label={effectiveShowGrouped ? "显示列表视图" : "显示分组视图"}
+                    title={effectiveShowGrouped ? "显示列表视图" : "显示分组视图"}
+                  >
+                    {effectiveShowGrouped ? (
+                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5m14 14H5" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* 语言切换器 */}
@@ -401,7 +428,7 @@ export function Dashboard({
             <div className="rounded-3xl bg-white/70 p-12 text-center text-slate-500 shadow-soft">
               {t("app.empty")}
             </div>
-          ) : showGrouped ? (
+          ) : effectiveShowGrouped ? (
             // 分组视图
             <div className="space-y-6">
               {/* 显示分组 */}
