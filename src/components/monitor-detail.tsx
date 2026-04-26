@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
 import Link from "next/link";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
@@ -15,6 +15,14 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 import { cn, formatDuration, formatNumber } from "@/lib/utils";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
 
 const SHOW_LINKS =
   process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "false" &&
@@ -139,16 +147,16 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                 <div className="flex items-center justify-between">
                   <span>{t("monitor.uptimeLast90")}</span>
                   <strong>
-                    {monitor.uptimeRatio.last90Days !== null
-                      ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
+                    {monitor.uptimeRatioLast90Days !== null
+                      ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
                       : "—"}
                   </strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>{t("monitor.downDurationLast90")}</span>
                   <strong>
-                    {monitor.downDuration.last90Days !== null
-                      ? formatDuration(monitor.downDuration.last90Days)
+                    {monitor.downDurationLast90Days !== null
+                      ? formatDuration(monitor.downDurationLast90Days)
                       : "—"}
                   </strong>
                 </div>
@@ -166,8 +174,8 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
 
               <p className="text-sm text-slate-500">
                 {monitor.incidents.total > 0 ||
-                  (monitor.downDuration.last90Days &&
-                    monitor.downDuration.last90Days > 0)
+                  (monitor.downDurationLast90Days &&
+                    monitor.downDurationLast90Days > 0)
                   ? monitor.incidents.downCount > 0 ||
                     monitor.incidents.pauseCount > 0
                     ? t("monitor.incidentsDetail", {
@@ -233,6 +241,16 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
               </div>
             </div>
           </section>
+
+          {/* 响应时间图表 */}
+          {monitor.responseTimes.length > 0 && (
+            <section className="rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
+              <h2 className="mb-4 text-lg font-semibold text-slate-800">
+                {t("monitor.responseChartTitle")}
+              </h2>
+              <ResponseTimeChart responseTimes={monitor.responseTimes} />
+            </section>
+          )}
 
           {/* 最近事件日志 */}
           <section className="rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
@@ -340,5 +358,100 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
         />
       ) : null}
     </Suspense>
+  );
+}
+
+interface ResponseTimeChartProps {
+  responseTimes: { datetime: string; value: number }[];
+}
+
+function ResponseTimeChart({ responseTimes }: ResponseTimeChartProps) {
+  const { t } = useLanguage();
+
+  const chartData = useMemo(() => {
+    // 最多显示最近 200 个数据点，避免图表过于密集
+    const sliced = responseTimes.slice(-200);
+    return sliced.map((rt) => ({
+      time: dayjs(rt.datetime).format("MM-DD HH:mm"),
+      value: rt.value,
+      timestamp: dayjs(rt.datetime).valueOf(),
+    }));
+  }, [responseTimes]);
+
+  const { avg, max, min } = useMemo(() => {
+    if (chartData.length === 0) return { avg: 0, max: 0, min: 0 };
+    const values = chartData.map((d) => d.value);
+    const sum = values.reduce((a, b) => a + b, 0);
+    return {
+      avg: Math.round(sum / values.length),
+      max: Math.max(...values),
+      min: Math.min(...values),
+    };
+  }, [chartData]);
+
+  if (chartData.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 p-8 text-center text-sm text-slate-500">
+        暂无响应时间数据
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+        <span>平均: <strong className="text-slate-700">{avg}ms</strong></span>
+        <span>最大: <strong className="text-slate-700">{max}ms</strong></span>
+        <span>最小: <strong className="text-slate-700">{min}ms</strong></span>
+        <span className="text-slate-400">共 {chartData.length} 个数据点</span>
+      </div>
+      <div className="h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis
+              dataKey="time"
+              tick={{ fontSize: 11, fill: "#94a3b8" }}
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#94a3b8" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v: number) => `${v}ms`}
+              width={60}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                fontSize: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+              }}
+              labelStyle={{ color: "#64748b", marginBottom: "4px" }}
+              formatter={(value: number) => [`${value}ms`, "响应时间"]}
+              labelFormatter={(label) => `时间: ${label}`}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="#10b981"
+              strokeWidth={1.5}
+              fill="url(#responseGradient)"
+              dot={false}
+              activeDot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }

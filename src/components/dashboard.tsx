@@ -599,8 +599,8 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
           <span className="text-xs text-slate-500">
             |
             {" "}
-            {monitor.uptimeRatio.last90Days !== null
-              ? `${formatNumber(monitor.uptimeRatio.last90Days)}%`
+            {monitor.uptimeRatioLast90Days !== null
+              ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
               : "—"}
           </span>
         </div>
