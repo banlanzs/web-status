@@ -139,13 +139,30 @@ function normalizeResponseTimes(
 
   return responseTimes
     .filter((rt) => {
-      const d = dayjs(rt.datetime);
+      const datetime = rt.datetime;
+      let d: dayjs.Dayjs;
+      if (typeof datetime === "number" || /^\d+$/.test(String(datetime))) {
+        const ts = Number(datetime);
+        d = ts < 1e12 ? dayjs.unix(ts) : dayjs(ts);
+      } else {
+        d = dayjs(datetime);
+      }
       return d.isValid() && d.isAfter(cutoff);
     })
-    .map((rt) => ({
-      datetime: rt.datetime,
-      value: rt.value,
-    }));
+    .map((rt) => {
+      const datetime = rt.datetime;
+      let d: dayjs.Dayjs;
+      if (typeof datetime === "number" || /^\d+$/.test(String(datetime))) {
+        const ts = Number(datetime);
+        d = ts < 1e12 ? dayjs.unix(ts) : dayjs(ts);
+      } else {
+        d = dayjs(datetime);
+      }
+      return {
+        datetime: d.toISOString(),
+        value: rt.value,
+      };
+    });
 }
 
 function normalizeMonitor(monitor: UptimeRobotMonitor): NormalizedMonitor {
