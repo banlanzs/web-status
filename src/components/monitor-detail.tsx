@@ -13,7 +13,7 @@ import { LoginModal } from "@/components/login-modal";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useLanguage } from "@/components/providers/language-provider";
-import { cn, formatDuration, formatNumber } from "@/lib/utils";
+import { formatDuration, formatNumber } from "@/lib/utils";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 import {
   ResponsiveContainer,
@@ -100,13 +100,33 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
     ? monitor.url
     : `https://${monitor.url}`;
 
-  const handleOpenMonitorLink = () => {
-    if (isProtectionEnabled && !isLoggedIn) {
-      setIsLoginModalOpen(true);
-      return;
-    }
-    window.open(monitorLink, "_blank", "noopener,noreferrer");
-  };
+  const linkButton = isProtectionEnabled && !isLoggedIn ? (
+    <button
+      type="button"
+      onClick={() => setIsLoginModalOpen(true)}
+      className="inline-flex items-center justify-center rounded-full p-1.5 transition bg-slate-100 text-slate-400 hover:bg-slate-200"
+      title={t("auth.loginPrompt")}
+      aria-label={t("auth.loginPrompt")}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+      </svg>
+    </button>
+  ) : (
+    <a
+      href={monitorLink}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center justify-center rounded-full p-1.5 transition bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
+      title={t("monitor.viewSite")}
+      aria-label={t("monitor.viewSite")}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+        <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+      </svg>
+    </a>
+  );
 
   return (
     <Suspense fallback={
@@ -202,38 +222,7 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                     )
                     : ""}
                 </span>
-                {SHOW_LINKS ? (
-                  <button
-                    type="button"
-                    onClick={handleOpenMonitorLink}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-full p-1.5 transition",
-                      isProtectionEnabled && !isLoggedIn
-                        ? "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                        : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700",
-                    )}
-                    title={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
-                    aria-label={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-4 w-4"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                        clipRule="evenodd"
-                      />
-                      <path
-                        fillRule="evenodd"
-                        d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                ) : (
+                {SHOW_LINKS ? linkButton : (
                   <span className="text-slate-400">
                     {t("monitor.linkDisabled")}
                   </span>

@@ -612,33 +612,27 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
           />
 
           {SHOW_LINKS ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (isProtectionEnabled && !isLoggedIn) {
-                  onRequestLogin();
-                  return;
-                }
-                window.open(
-                  monitor.url.startsWith("http")
-                    ? monitor.url
-                    : `https://${monitor.url}`,
-                  "_blank",
-                  "noopener,noreferrer",
-                );
-              }}
-              className={`inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition ${isProtectionEnabled && !isLoggedIn
-                ? "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                : "bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                }`}
-              title={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
-              aria-label={isProtectionEnabled && !isLoggedIn ? t("auth.loginPrompt") : t("monitor.viewSite")}
-            >
-              {isProtectionEnabled && !isLoggedIn ? (
+            isProtectionEnabled && !isLoggedIn ? (
+              <button
+                type="button"
+                onClick={onRequestLogin}
+                className="inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition bg-slate-100 text-slate-400 hover:bg-slate-200"
+                title={t("auth.loginPrompt")}
+                aria-label={t("auth.loginPrompt")}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                   <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                 </svg>
-              ) : (
+              </button>
+            ) : (
+              <a
+                href={monitor.url.startsWith("http") ? monitor.url : `https://${monitor.url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                title={t("monitor.viewSite")}
+                aria-label={t("monitor.viewSite")}
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
@@ -656,8 +650,8 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
                     clipRule="evenodd"
                   />
                 </svg>
-              )}
-            </button>
+              </a>
+            )
           ) : null}
         </div>
       </div>
