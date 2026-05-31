@@ -5,27 +5,19 @@ import type { MonitorStatus } from "@/types/uptimerobot";
 
 const STATUS_STYLES: Record<
   MonitorStatus,
-  { bg: string; dot: string; text: string }
+  { className: string }
 > = {
   up: {
-    bg: "bg-success/10 text-success-foreground",
-    dot: "bg-success",
-    text: "text-success-foreground",
+    className: "up",
   },
   down: {
-    bg: "bg-danger/10 text-danger-foreground",
-    dot: "bg-danger",
-    text: "text-danger-foreground",
+    className: "down",
   },
   paused: {
-    bg: "bg-warning/10 text-warning-foreground",
-    dot: "bg-warning",
-    text: "text-warning-foreground",
+    className: "pause",
   },
   unknown: {
-    bg: "bg-slate-200 text-slate-600",
-    dot: "bg-slate-400",
-    text: "text-slate-600",
+    className: "",
   },
 };
 
@@ -38,22 +30,9 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const styles = STATUS_STYLES[status] ?? STATUS_STYLES.unknown;
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium",
-        styles.bg,
-        className,
-      )}
-    >
-      <span
-        className={cn(
-          "h-2.5 w-2.5 rounded-full",
-          styles.dot,
-          "shadow-[0_0_0_3px_rgba(255,255,255,0.4)]",
-        )}
-      />
-      <span className={styles.text}>{label}</span>
+    <span className={cn("badge", styles.className, className)}>
+      <span className="dot" />
+      <span>{label}</span>
     </span>
   );
 }
-

@@ -48,3 +48,5 @@ monitor-settings.json
 
 #
 .claude/
+.playwright-mcp/
+ui-template/

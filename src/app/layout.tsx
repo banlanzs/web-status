@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { LanguageProvider } from "@/components/providers/language-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { MonitorsProvider } from "@/components/providers/monitors-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import { RateLimitIndicator } from "@/components/rate-limit-indicator";
 import ErrorBoundary from "@/components/error-boundary";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "✅ BANLAN站点监测",
@@ -36,19 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="zh" data-theme="light">
+      <body className="antialiased">
         <ErrorBoundary>
-          <LanguageProvider>
-            <AuthProvider>
-              <MonitorsProvider>
-                {children}
-                <RateLimitIndicator />
-              </MonitorsProvider>
-            </AuthProvider>
-          </LanguageProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <AuthProvider>
+                <MonitorsProvider>
+                  {children}
+                  <RateLimitIndicator />
+                </MonitorsProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

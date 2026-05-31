@@ -10,31 +10,45 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        success: {
-          DEFAULT: "#34d399",
-          foreground: "#064e3b",
-        },
-        warning: {
-          DEFAULT: "#f97316",
-          foreground: "#7c2d12",
-        },
-        danger: {
-          DEFAULT: "#f87171",
-          foreground: "#7f1d1d",
-        },
-        slate: {
-          850: "#1f2937",
-        },
+      fontFamily: {
+        display: ["Georgia", "Times New Roman", "serif"],
+        body: ["Arial", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["ui-monospace", "JetBrains Mono", "Menlo", "monospace"],
       },
-      backgroundImage: {
-        "hero-gradient":
-          "linear-gradient(135deg, rgba(16,185,129,0.95), rgba(20,184,166,0.95))",
-        "hero-gradient-warning":
-          "linear-gradient(135deg, rgba(251,191,36,0.95), rgba(245,158,11,0.95))",
+      colors: {
+        // Map to CSS variables for theme support
+        bg: "var(--bg)",
+        surface: "var(--surface)",
+        "surface-warm": "var(--surface-warm)",
+        fg: "var(--fg)",
+        "fg-2": "var(--fg-2)",
+        muted: "var(--muted)",
+        meta: "var(--meta)",
+        border: "var(--border)",
+        "border-soft": "var(--border-soft)",
+        accent: "var(--accent)",
+        "accent-on": "var(--accent-on)",
+        success: "var(--success)",
+        warn: "var(--warn)",
+        danger: "var(--danger)",
+      },
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        pill: "var(--radius-pill)",
       },
       boxShadow: {
-        soft: "0 20px 45px -20px rgba(15, 118, 110, 0.35)",
+        ring: "var(--elev-ring)",
+        raised: "var(--elev-raised)",
+        "focus-ring": "var(--focus-ring)",
+      },
+      transitionDuration: {
+        fast: "var(--motion-fast)",
+        base: "var(--motion-base)",
+      },
+      transitionTimingFunction: {
+        standard: "var(--ease-standard)",
       },
     },
   },
@@ -42,4 +56,3 @@ const config: Config = {
 };
 
 export default config;
-
