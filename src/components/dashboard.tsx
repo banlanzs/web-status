@@ -551,14 +551,18 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
       if (dateStr === today && monitor.status === "down") {
         color = "bg-rose-500"; // 当前故障 - 红色
         status = "down";
-      } else if (uptime <= 30) {
-        // 严重故障（可用率低于 30%）- 红色
+      } else if (uptime < 50) {
+        // 严重故障（可用率低于 50%）- 红色
         color = "bg-rose-500";
         status = "down";
-      } else {
-        // 轻微故障或已恢复的故障 - 黄色
+      } else if (uptime < 95) {
+        // 中等故障（可用率 50%-95%）- 黄色
         color = "bg-amber-500";
         status = "warning";
+      } else {
+        // 轻微故障（可用率 >= 95%）- 绿色，因为大部分时间正常
+        color = "bg-emerald-500";
+        status = "normal";
       }
     } else if (hasPausedLog && pausedDuration > 43200) {
       // 部分暂停但超过半天（12小时）

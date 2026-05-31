@@ -264,7 +264,7 @@ export async function fetchMonitors(forceUpdate = false): Promise<NormalizedMoni
     api_key: apiKey,
     format: "json",
     logs: "1",
-    logs_limit: "300",
+    logs_limit: "1000",
     log_types: "1-2-98-99",
     logs_start_date: String(logsStartDate),
     logs_end_date: String(logsEndDate),
