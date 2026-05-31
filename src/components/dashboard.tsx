@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Footer } from "@/components/footer";
 import { TopNav } from "@/components/top-nav";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { StatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useMonitors } from "@/components/providers/monitors-provider";
@@ -324,6 +325,7 @@ export function Dashboard({
       </main>
 
       <Footer />
+      <ScrollToTop />
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
