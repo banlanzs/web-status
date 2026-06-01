@@ -15,8 +15,8 @@ import { useMonitors } from "@/components/providers/monitors-provider";
 import { LoadingOverlay } from "@/components/loading";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
 import { formatNumber, formatDuration } from "@/lib/utils";
-import { useAuth } from "@/components/providers/auth-provider";
 import { LoginModal } from "@/components/login-modal";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const DEFAULT_REFRESH_SECONDS = Number(
   process.env.NEXT_PUBLIC_REFRESH_INTERVAL_SECONDS ?? 300,
@@ -43,7 +43,6 @@ export function Dashboard({
 }: DashboardProps) {
   const { t, language } = useLanguage();
   const { monitors, isLoading, error, refresh, lastUpdated } = useMonitors();
-  const { isLoggedIn, isProtectionEnabled } = useAuth();
   const [secondsLeft, setSecondsLeft] = useState(refreshInterval);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [currentFilter, setCurrentFilter] = useState<FilterType>("all");
@@ -91,25 +90,23 @@ export function Dashboard({
   }, [summary, t]);
 
   const overallStatus = useMemo(() => {
-    if (summary.total === 0) return "unknown";
+    if (summary.total === 0) return "paused";
     if (summary.down === summary.total) return "down";
-    if (summary.down > 0) return "down";
+    if (summary.down > 0) return "degraded";
     if (summary.paused === summary.total) return "paused";
     return "up";
-  }, [summary]);
+  }, [summary]) as "up" | "degraded" | "down" | "paused";
 
   const formattedUpdatedAt = useMemo(
-    () => dayjs(lastUpdated || fetchedAt).format("HH:mm"),
+    () => dayjs(lastUpdated || fetchedAt).format("YYYY-MM-DD HH:mm:ss"),
     [lastUpdated, fetchedAt],
   );
 
   const formattedCountdown = useMemo(() => {
     const minutes = Math.floor(secondsLeft / 60);
     const seconds = secondsLeft % 60;
-    if (minutes > 0) {
-      return `${minutes}m${seconds}s`;
-    }
-    return `${seconds}s`;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(minutes)}:${pad(seconds)}`;
   }, [secondsLeft]);
 
   // 筛选后的监控列表
@@ -184,77 +181,70 @@ export function Dashboard({
   }, [hasIssues, t]);
 
   return (
-    <div className="min-h-screen bg-bg">
-      <TopNav onRequestLogin={() => setIsLoginModalOpen(true)} />
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+      <TopNav onRequestLogin={() => setIsLoginModalOpen(true)} overallStatus={overallStatus} />
 
       <main>
         {/* Hero Section */}
         <section className="hero">
-          <div className="container">
-            <div className={`status-hero ${hasIssues ? "has-issues" : ""}`}>
-              <div className="hero-top">
-                <div>
-                  <p className="eyebrow">PUBLIC STATUS · WEB STATUS</p>
-                  <StatusBadge status={overallStatus as any} label={summaryTagline} />
-                  <h1 style={{ marginTop: "var(--space-5)" }}>
-                    {summaryTagline}
-                  </h1>
-                  <p className="lead" style={{ marginTop: "var(--space-5)", maxWidth: "62ch", color: "var(--muted)", fontSize: "var(--text-lg)" }}>
-                    {t("app.monitorsSummary", {
-                      total: summary.total,
-                      up: summary.up,
-                      down: summary.down,
-                      paused: summary.paused,
-                    })}
-                  </p>
-                </div>
-                <div className="badge" aria-live="polite">
-                  <span>{t("app.nextRefresh", { seconds: formattedCountdown })}</span>
-                  {refreshInterval > 0 ? (
-                    <button
-                      type="button"
-                      onClick={handleForceRefresh}
-                      disabled={isLoading}
-                      className="btn btn-small"
-                      title={isLoading ? t("controls.refreshing") : t("controls.refresh")}
-                      style={{ marginLeft: "var(--space-2)" }}
+          <div className="hero__bg" aria-hidden="true" />
+          <div className="container hero__inner">
+            <span className="hero__eyebrow">
+              <span>PUBLIC STATUS · WEB STATUS</span>
+            </span>
+            <h1 className="hero__title">{summaryTagline}</h1>
+            <p className="hero__lede">
+              {t("app.monitorsSummary", {
+                total: summary.total,
+                up: summary.up,
+                down: summary.down,
+                paused: summary.paused,
+              })}
+            </p>
+
+            <div className="hero__meta">
+              <div>
+                <span>Last updated</span> · <b>{formattedUpdatedAt}</b>
+              </div>
+              <div>
+                <span>Next refresh in</span> · <b className="mono">{formattedCountdown}</b>
+                {refreshInterval > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleForceRefresh}
+                    disabled={isLoading}
+                    className="btn btn--small btn--ghost"
+                    title={isLoading ? t("controls.refreshing") : t("controls.refresh")}
+                    style={{ marginLeft: "var(--space-2)", padding: "4px 8px" }}
+                  >
+                    <svg
+                      className={isLoading ? "animate-spin" : ""}
+                      style={{ height: "14px", width: "14px" }}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className={isLoading ? "animate-spin" : ""}
-                        style={{ height: "16px", width: "16px" }}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
-              <div className="hero-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "var(--space-3)", marginTop: "var(--space-8)" }}>
-                <div className="stat-card">
-                  <span className="stat-value">{summary.total}</span>
-                  <div className="stat-label">{language === "zh" ? "监控总数" : "Total"}</div>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{summary.up}</span>
-                  <div className="stat-label">{language === "zh" ? "运行正常" : "Operational"}</div>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{summary.down}</span>
-                  <div className="stat-label">{language === "zh" ? "异常" : "Down"}</div>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{formattedUpdatedAt}</span>
-                  <div className="stat-label">{language === "zh" ? "最后更新" : "Updated"}</div>
-                </div>
+              <div>
+                <span>Monitors</span> · <b>{summary.total}</b>
               </div>
+              <div>
+                <span>Operational</span> · <b>{summary.up}</b>
+              </div>
+              {summary.down > 0 && (
+                <div>
+                  <span>Down</span> · <b style={{ color: "var(--status-down-fg)" }}>{summary.down}</b>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -262,7 +252,7 @@ export function Dashboard({
         <LoadingOverlay show={isLoading} />
 
         {/* Monitor List */}
-        <section style={{ padding: "var(--space-8) 0 var(--section-y-desktop)" }}>
+        <section className="section">
           <div className="container">
             {displayError ? (
               <div style={{
@@ -288,33 +278,36 @@ export function Dashboard({
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: "var(--space-6)", marginBottom: "var(--space-6)" }}>
+                <div className="section__head">
                   <div>
-                    <p className="eyebrow">MONITORS</p>
-                    <h2>{language === "zh" ? "公开服务状态" : "Public service status"}</h2>
+                    <h2 className="section__title">
+                      {language === "zh" ? "监控列表" : "Monitors"}
+                    </h2>
+                    <p className="body-muted body-sm">
+                      {language === "zh" ? "90 天可用性 · 点击名称查看详情" : "90-day availability · click a name to view detail"}
+                    </p>
                   </div>
-                  <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }} role="group" aria-label="Monitor filters">
-                    {(["all", "up", "down", "pause"] as FilterType[]).map((filter) => (
-                      <button
-                        key={filter}
-                        className={`btn btn-small ${currentFilter === filter ? "btn-primary" : ""}`}
-                        type="button"
-                        onClick={() => setCurrentFilter(filter)}
-                      >
-                        {filter === "all" ? (language === "zh" ? "全部" : "All") :
-                         filter === "up" ? "Up" :
-                         filter === "down" ? "Down" :
-                         "Paused"}
-                      </button>
-                    ))}
+                  <div className="legend" aria-label="Legend">
+                    <span className="legend__item">
+                      <span className="legend__sw" style={{ background: "var(--status-up-fg)" }} />
+                      <span>{language === "zh" ? "正常" : "Operational"}</span>
+                    </span>
+                    <span className="legend__item">
+                      <span className="legend__sw" style={{ background: "var(--status-down-fg)" }} />
+                      <span>{language === "zh" ? "故障" : "Outage"}</span>
+                    </span>
+                    <span className="legend__item">
+                      <span className="legend__sw" style={{ background: "var(--status-paused-fg)" }} />
+                      <span>{language === "zh" ? "已暂停" : "Paused"}</span>
+                    </span>
                   </div>
                 </div>
-                <div style={{ display: "grid", gap: "var(--space-4)" }}>
+
+                <div className="monitor-list">
                   {filteredMonitors.map((monitor) => (
                     <MonitorListItem
                       key={monitor.id}
                       monitor={monitor}
-                      onRequestLogin={() => setIsLoginModalOpen(true)}
                     />
                   ))}
                 </div>
@@ -333,14 +326,13 @@ export function Dashboard({
 
 interface MonitorListItemProps {
   monitor: NormalizedMonitor;
-  onRequestLogin: () => void;
 }
 
 const SHOW_LINKS =
   process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "false" &&
   process.env.NEXT_PUBLIC_SHOW_MONITOR_LINKS !== "0";
 
-function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
+function MonitorListItem({ monitor }: MonitorListItemProps) {
   const { t, language } = useLanguage();
   const { isLoggedIn, isProtectionEnabled } = useAuth();
   const segments = STATUS_DAYS;
@@ -423,7 +415,7 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
       } else if (uptime < 50) {
         color = "down";
       } else if (uptime < 95) {
-        color = "warn";
+        color = "degraded";
       } else {
         color = "up";
       }
@@ -442,30 +434,66 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
     return `${day.date} - ${formatNumber(day.uptime)}%`;
   };
 
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "up": return "badge--up";
+      case "down": return "badge--down";
+      case "paused": return "badge--paused";
+      case "degraded": return "badge--degraded";
+      default: return "";
+    }
+  };
+
+  const getStatusCellClass = (color: string) => {
+    switch (color) {
+      case "degraded": return "status-bars__cell--degraded";
+      case "down": return "status-bars__cell--down";
+      case "pause": return "status-bars__cell--paused";
+      default: return "";
+    }
+  };
+
+  // 获取监控名称的前两个字符作为图标
+  const monitorIcon = monitor.name.substring(0, 2).toUpperCase();
+
   return (
-    <article className={`monitor-card ${monitor.status}`}>
-      <div className="monitor-main">
-        <div className="monitor-title">
-          <span className="dot"></span>
-          <Link href={`/monitor/${monitor.id}`} prefetch={false}>
+    <article className="monitor-card">
+      <div className="monitor-card__head">
+        <div className="monitor-card__icon" aria-hidden="true">{monitorIcon}</div>
+        <div style={{ minWidth: 0 }}>
+          <Link className="monitor-card__name" href={`/monitor/${monitor.id}`}>
             {monitor.name}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 12, height: 12, color: "var(--muted)" }}>
+              <path d="M7 17 17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
           </Link>
         </div>
       </div>
-      <div style={{ display: "grid", gap: "var(--space-2)" }}>
-        <div className="history-meta">
+
+      <div className="monitor-card__uptime">
+        <span className={`badge ${getStatusBadgeClass(monitor.status)}`}>
+          <span className="badge__dot" />
+          {t(`monitor.status.${monitor.status}` as const)}
+        </span>
+        <span className="monitor-card__uptime-value">
+          {monitor.uptimeRatioLast90Days !== null
+            ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
+            : "—"}
+        </span>
+        <span className="monitor-card__uptime-label">Uptime</span>
+      </div>
+
+      <div className="monitor-card__bars">
+        <div className="monitor-card__bars-label">
           <span>{segments} {language === "zh" ? "天" : "days"}</span>
-          <strong style={{ fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
-            {monitor.uptimeRatioLast90Days !== null
-              ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
-              : "—"}
-          </strong>
+          <span>→</span>
         </div>
-        <div ref={barRef} className="days" onClick={() => setActiveIndex(null)}>
+        <div ref={barRef} className="status-bars" onClick={() => setActiveIndex(null)}>
           {dayData.map((day, index) => (
-            <span
+            <div
               key={`${monitor.id}-${index}`}
-              className={`day ${day.color}`}
+              className={`status-bars__cell ${getStatusCellClass(day.color)}`}
               title={tooltipForDay(day)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -490,7 +518,7 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
               whiteSpace: "nowrap",
               borderRadius: "var(--radius-md)",
               background: "var(--fg)",
-              color: "var(--surface)",
+              color: "var(--bg)",
               padding: "var(--space-2) var(--space-3)",
               fontSize: "var(--text-xs)",
               fontFamily: "var(--font-mono)",
@@ -500,40 +528,24 @@ function MonitorListItem({ monitor, onRequestLogin }: MonitorListItemProps) {
           </div>
         )}
       </div>
-      <div className="card-actions">
-        <span className={`badge ${monitor.status}`}>
-          <span className="dot"></span>
-          {t(`monitor.status.${monitor.status}` as const)}
-        </span>
-        {SHOW_LINKS && isLoggedIn ? (
+
+      <div className="monitor-card__action">
+        {SHOW_LINKS && (!isProtectionEnabled || isLoggedIn) ? (
           <a
+            className="icon-btn"
             href={monitor.url.startsWith("http") ? monitor.url : `https://${monitor.url}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition bg-white text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-            style={{ textDecoration: "none" }}
-            title={t("monitor.viewSite")}
-            aria-label={t("monitor.viewSite")}
+            aria-label={`${language === "zh" ? "打开" : "Open"} ${monitor.name}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ height: "16px", width: "16px" }}>
-              <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
-              <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
           </a>
-        ) : SHOW_LINKS && isProtectionEnabled && !isLoggedIn ? (
-          <button
-            type="button"
-            onClick={onRequestLogin}
-            className="inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition bg-slate-100 text-slate-400 hover:bg-slate-200"
-            title={t("auth.loginPrompt")}
-            aria-label={t("auth.loginPrompt")}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ height: "16px", width: "16px" }}>
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-            </svg>
-          </button>
         ) : null}
-        <Link className="btn btn-primary btn-small" href={`/monitor/${monitor.id}`}>
+        <Link className="btn btn--primary btn--small" href={`/monitor/${monitor.id}`}>
           {language === "zh" ? "查看详情" : "Details"}
         </Link>
       </div>
