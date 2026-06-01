@@ -147,7 +147,7 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 8 }}>
+              <div>
                 {SHOW_LINKS && (!isProtectionEnabled || isLoggedIn) ? (
                   <a className="btn btn--secondary" href={monitorLink} target="_blank" rel="noopener noreferrer">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 14, height: 14 }}>
