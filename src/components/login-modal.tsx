@@ -10,7 +10,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
-    const { t, language } = useLanguage();
+    const { t } = useLanguage();
     const { login } = useAuth();
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -62,46 +62,33 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             <div
                 style={{
                     width: "100%",
-                    maxWidth: "420px",
+                    maxWidth: "384px",
                     overflow: "hidden",
                     background: "var(--surface)",
-                    borderRadius: "var(--radius-md)",
-                    boxShadow: "var(--elev-floating)",
+                    borderRadius: "var(--radius-lg)",
+                    boxShadow: "var(--elev-raised)",
                     border: "1px solid var(--border)",
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div style={{ padding: "var(--space-8)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-                        <h3 style={{ fontSize: "var(--text-2xl)", fontWeight: 600, color: "var(--fg)", letterSpacing: "var(--tracking-display)" }}>
+                <div style={{ padding: "var(--space-6)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
+                        <h3 style={{ fontSize: "var(--text-xl)", fontWeight: 600, color: "var(--fg)" }}>
                             {t("auth.loginTitle")}
                         </h3>
                         <button
                             onClick={onClose}
                             style={{
-                                padding: "var(--space-2)",
-                                color: "var(--muted)",
+                                padding: "var(--space-1)",
+                                color: "var(--meta)",
                                 borderRadius: "var(--radius-sm)",
                                 background: "transparent",
                                 border: "none",
                                 cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                transition: "background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard)",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "color-mix(in oklab, var(--fg), transparent 92%)";
-                                e.currentTarget.style.color = "var(--fg)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "var(--muted)";
                             }}
                         >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            <svg xmlns="http://www.w3.org/2000/svg" style={{ width: "20px", height: "20px" }} viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
                         </button>
                     </div>
@@ -111,39 +98,34 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     </p>
 
                     <form onSubmit={handleSubmit} style={{ display: "grid", gap: "var(--space-4)" }}>
-                        <div className="field">
-                            <label htmlFor="login-password" style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--fg)" }}>
-                                {language === "zh" ? "密码" : "Password"}
-                            </label>
+                        <div>
                             <input
                                 ref={inputRef}
-                                id="login-password"
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder={t("auth.passwordPlaceholder")}
                                 style={{
                                     width: "100%",
-                                    padding: "10px 12px",
+                                    padding: "var(--space-2) var(--space-4)",
                                     color: "var(--fg)",
-                                    background: "var(--surface)",
-                                    border: "1px solid var(--border)",
-                                    borderRadius: "var(--radius-sm)",
+                                    background: "var(--surface-warm)",
+                                    border: "1px solid var(--border-soft)",
+                                    borderRadius: "var(--radius-md)",
                                     fontSize: "var(--text-base)",
                                     outline: "none",
-                                    transition: "border-color var(--motion-fast) var(--ease-standard)",
                                 }}
                                 onFocus={(e) => {
-                                    e.currentTarget.style.borderColor = "var(--accent)";
                                     e.currentTarget.style.boxShadow = "var(--focus-ring)";
+                                    e.currentTarget.style.borderColor = "var(--accent)";
                                 }}
                                 onBlur={(e) => {
-                                    e.currentTarget.style.borderColor = "var(--border)";
                                     e.currentTarget.style.boxShadow = "";
+                                    e.currentTarget.style.borderColor = "var(--border-soft)";
                                 }}
                             />
                             {error && (
-                                <p style={{ marginTop: "var(--space-1)", fontSize: "var(--text-xs)", color: "var(--danger)" }}>
+                                <p style={{ marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--danger)" }}>
                                     {error}
                                 </p>
                             )}
@@ -152,12 +134,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                         <button
                             type="submit"
                             disabled={isSubmitting || !password}
-                            className="btn btn--primary btn--block"
-                            style={{ marginTop: "var(--space-2)" }}
+                            className="btn btn-primary"
+                            style={{ width: "100%" }}
                         >
                             {isSubmitting ? (
                                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--space-2)" }}>
-                                    <svg style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none">
+                                    <svg style={{ width: "16px", height: "16px", animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none">
                                         <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>

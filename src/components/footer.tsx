@@ -8,32 +8,24 @@ export function Footer() {
   const startYear = 2025;
   const yearRange = currentYear > startYear ? `${startYear}-${currentYear}` : `${startYear}`;
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <footer className="footer">
-      <div className="container footer__inner">
-        <div>
-          © {yearRange} Web STATUS ·{" "}
+    <footer className="pagefoot">
+      <div className="container">
+        <span>
+          Web STATUS · © {yearRange}{" "}
           <a
             href="https://github.com/banlanzs"
             target="_blank"
             rel="noopener noreferrer"
+            style={{ color: "var(--accent)" }}
           >
             banlan
           </a>
-        </div>
-        <div className="footer__links">
-          <a href="#">{language === "zh" ? "关于" : "About"}</a>
-          <a href="#">{language === "zh" ? "更新日志" : "Changelog"}</a>
-          <a href="#">{language === "zh" ? "隐私" : "Privacy"}</a>
-          <a href="#">{language === "zh" ? "条款" : "Terms"}</a>
-          <a
-            href={process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/banlanzs/web-status"}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-        </div>
+        </span>
       </div>
     </footer>
   );
