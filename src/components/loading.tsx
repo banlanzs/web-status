@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * 页面加载进度条
+ * 在页面切换时显示顶部加载条
  */
 export function LoadingBar() {
   const router = useRouter();
@@ -13,9 +14,11 @@ export function LoadingBar() {
 
   useEffect(() => {
     let progressTimer: NodeJS.Timeout;
-
+    
     if (loading) {
       setProgress(10);
+      
+      // 模拟进度增长
       progressTimer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return 90;
@@ -24,28 +27,39 @@ export function LoadingBar() {
       }, 300);
     } else {
       setProgress(100);
-      setTimeout(() => { setProgress(0); }, 500);
+      
+      // 完成后重置
+      setTimeout(() => {
+        setProgress(0);
+      }, 500);
     }
 
-    return () => { if (progressTimer) clearInterval(progressTimer); };
+    return () => {
+      if (progressTimer) clearInterval(progressTimer);
+    };
   }, [loading]);
 
+  // 监听路由变化
   useEffect(() => {
     const handleStart = () => setLoading(true);
     const handleComplete = () => setLoading(false);
+
+    // Next.js 15+ 使用新的事件监听方式
     window.addEventListener("beforeunload", handleStart);
-    return () => { window.removeEventListener("beforeunload", handleStart); };
+    
+    return () => {
+      window.removeEventListener("beforeunload", handleStart);
+    };
   }, [router]);
 
   if (progress === 0) return null;
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 h-1 transition-all duration-300 ease-out"
+      className="fixed top-0 left-0 right-0 z-50 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 transition-all duration-300 ease-out"
       style={{
         width: `${progress}%`,
         opacity: progress === 100 ? 0 : 1,
-        background: "linear-gradient(90deg, var(--accent), var(--warn))",
       }}
     />
   );
@@ -56,21 +70,14 @@ export function LoadingBar() {
  */
 export function SkeletonCard() {
   return (
-    <div style={{
-      borderRadius: "var(--radius-lg)",
-      border: "1px solid var(--border)",
-      background: "var(--surface)",
-      padding: "var(--space-5)",
-      boxShadow: "var(--elev-ring)",
-      animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-    }}>
-      <div style={{ marginBottom: "var(--space-3)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ height: "24px", width: "192px", background: "var(--border-soft)", borderRadius: "var(--radius-sm)" }}></div>
-        <div style={{ height: "32px", width: "80px", background: "var(--border-soft)", borderRadius: "var(--radius-pill)" }}></div>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 animate-pulse">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="h-6 w-48 bg-slate-200 rounded"></div>
+        <div className="h-8 w-20 bg-slate-200 rounded-full"></div>
       </div>
-      <div style={{ display: "grid", gap: "var(--space-2)" }}>
-        <div style={{ height: "16px", width: "100%", background: "var(--border-soft)", borderRadius: "var(--radius-sm)" }}></div>
-        <div style={{ height: "16px", width: "75%", background: "var(--border-soft)", borderRadius: "var(--radius-sm)" }}></div>
+      <div className="space-y-2">
+        <div className="h-4 w-full bg-slate-200 rounded"></div>
+        <div className="h-4 w-3/4 bg-slate-200 rounded"></div>
       </div>
     </div>
   );
@@ -83,31 +90,10 @@ export function LoadingOverlay({ show }: { show: boolean }) {
   if (!show) return null;
 
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 40,
-      background: "color-mix(in oklab, var(--bg), transparent 20%)",
-      backdropFilter: "blur(4px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{
-          display: "inline-block",
-          height: "48px",
-          width: "48px",
-          animation: "spin 1s linear infinite",
-          borderRadius: "9999px",
-          borderWidth: "4px",
-          borderStyle: "solid",
-          borderColor: "var(--accent)",
-          borderRightColor: "transparent",
-        }}></div>
-        <p style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-          加载中...
-        </p>
+    <div className="fixed inset-0 z-40 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+      <div className="text-center">
+        <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-emerald-500 border-r-transparent"></div>
+        <p className="mt-4 text-sm text-slate-600">加载中...</p>
       </div>
     </div>
   );
@@ -118,17 +104,8 @@ export function LoadingOverlay({ show }: { show: boolean }) {
  */
 export function InlineLoader() {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-      <div style={{
-        height: "16px",
-        width: "16px",
-        animation: "spin 1s linear infinite",
-        borderRadius: "9999px",
-        borderWidth: "2px",
-        borderStyle: "solid",
-        borderColor: "var(--accent)",
-        borderRightColor: "transparent",
-      }}></div>
+    <div className="inline-flex items-center gap-2 text-sm text-slate-600">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-emerald-500 border-r-transparent"></div>
       <span>加载中...</span>
     </div>
   );

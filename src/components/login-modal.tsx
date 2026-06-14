@@ -10,6 +10,8 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ isOpen, onClose }: LoginModalProps) {
+    // Use translations if available, or fallbacks
+    // Looking at language-provider, it seems to use t(key)
     const { t } = useLanguage();
     const { login } = useAuth();
     const [password, setPassword] = useState("");
@@ -19,6 +21,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     useEffect(() => {
         if (isOpen) {
+            // Focus input when modal opens
             setTimeout(() => inputRef.current?.focus(), 100);
             setPassword("");
             setError("");
@@ -45,87 +48,42 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     if (!isOpen) return null;
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 50,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "var(--space-4)",
-                background: "rgba(0, 0, 0, 0.5)",
-                backdropFilter: "blur(4px)",
-            }}
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                style={{
-                    width: "100%",
-                    maxWidth: "384px",
-                    overflow: "hidden",
-                    background: "var(--surface)",
-                    borderRadius: "var(--radius-lg)",
-                    boxShadow: "var(--elev-raised)",
-                    border: "1px solid var(--border)",
-                }}
+                className="w-full max-w-sm overflow-hidden bg-white rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div style={{ padding: "var(--space-6)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
-                        <h3 style={{ fontSize: "var(--text-xl)", fontWeight: 600, color: "var(--fg)" }}>
-                            {t("auth.loginTitle")}
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-slate-800">
+                            {t("auth.loginTitle") || "Admin Access"}
                         </h3>
                         <button
                             onClick={onClose}
-                            style={{
-                                padding: "var(--space-1)",
-                                color: "var(--meta)",
-                                borderRadius: "var(--radius-sm)",
-                                background: "transparent",
-                                border: "none",
-                                cursor: "pointer",
-                            }}
+                            className="p-1 text-slate-400 rounded-full hover:bg-slate-100 hover:text-slate-600 transition"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" style={{ width: "20px", height: "20px" }} viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
                         </button>
                     </div>
 
-                    <p style={{ marginBottom: "var(--space-6)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-                        {t("auth.loginDescription")}
+                    <p className="mb-6 text-sm text-slate-600">
+                        {t("auth.loginDescription") || "Enter your password to access site links."}
                     </p>
 
-                    <form onSubmit={handleSubmit} style={{ display: "grid", gap: "var(--space-4)" }}>
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <input
                                 ref={inputRef}
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder={t("auth.passwordPlaceholder")}
-                                style={{
-                                    width: "100%",
-                                    padding: "var(--space-2) var(--space-4)",
-                                    color: "var(--fg)",
-                                    background: "var(--surface-warm)",
-                                    border: "1px solid var(--border-soft)",
-                                    borderRadius: "var(--radius-md)",
-                                    fontSize: "var(--text-base)",
-                                    outline: "none",
-                                }}
-                                onFocus={(e) => {
-                                    e.currentTarget.style.boxShadow = "var(--focus-ring)";
-                                    e.currentTarget.style.borderColor = "var(--accent)";
-                                }}
-                                onBlur={(e) => {
-                                    e.currentTarget.style.boxShadow = "";
-                                    e.currentTarget.style.borderColor = "var(--border-soft)";
-                                }}
+                                placeholder={t("auth.passwordPlaceholder") || "Password"}
+                                className="w-full px-4 py-2 text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all placeholder:text-slate-400"
                             />
                             {error && (
-                                <p style={{ marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--danger)" }}>
+                                <p className="mt-2 text-xs text-rose-500 font-medium animate-in slide-in-from-top-1">
                                     {error}
                                 </p>
                             )}
@@ -134,19 +92,18 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                         <button
                             type="submit"
                             disabled={isSubmitting || !password}
-                            className="btn btn-primary"
-                            style={{ width: "100%" }}
+                            className="w-full px-4 py-2.5 font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                         >
                             {isSubmitting ? (
-                                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--space-2)" }}>
-                                    <svg style={{ width: "16px", height: "16px", animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none">
-                                        <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <span className="flex items-center justify-center gap-2">
+                                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    {t("auth.loggingIn")}
+                                    {t("auth.loggingIn") || "Logging in..."}
                                 </span>
                             ) : (
-                                t("auth.loginButton")
+                                t("auth.loginButton") || "Login"
                             )}
                         </button>
                     </form>

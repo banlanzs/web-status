@@ -9,10 +9,8 @@ import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
 
-import { TopNav } from "@/components/top-nav";
 import { LoginModal } from "@/components/login-modal";
 import { StatusBadge } from "@/components/status-badge";
-import { Footer } from "@/components/footer";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 import { formatDuration, formatNumber } from "@/lib/utils";
@@ -35,36 +33,59 @@ interface MonitorDetailProps {
 }
 
 export function MonitorDetail({ monitor }: MonitorDetailProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { isLoggedIn, isProtectionEnabled } = useAuth();
   const statusLabel = t(`monitor.status.${monitor.status}` as const);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  // 添加 ref 来跟踪组件是否已卸载
   const isMountedRef = useRef(true);
+
+  // 日志分页状态
   const [visibleLogsCount, setVisibleLogsCount] = useState(5);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+  // 每次加载更多日志的数量
   const LOGS_PER_PAGE = 10;
 
+  // 组件卸载时设置 isMountedRef 为 false
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
+  // 获取排序后的日志
   const sortedLogs = [...monitor.logs].sort((a, b) => {
     const timeDiff = dayjs(b.datetime).valueOf() - dayjs(a.datetime).valueOf();
     if (timeDiff !== 0) return timeDiff;
+
+    // 时间相同时的排序规则 (降序/显示顺序)
+    // Paused (99) 应该在 Up (2) 之前顯示 (作为最新状态)
     if (a.type === 99 && b.type === 2) return -1;
     if (a.type === 2 && b.type === 99) return 1;
+
+    // Started (98) 应该在 Paused (99) 之前顯示 (作为最新状态)
     if (a.type === 98 && b.type === 99) return -1;
     if (a.type === 99 && b.type === 98) return 1;
+
     return 0;
   });
 
+  // 当前显示的日志
   const visibleLogs = sortedLogs.slice(0, visibleLogsCount);
+
+  // 是否还有更多日志可以加载
   const hasMoreLogs = visibleLogsCount < sortedLogs.length;
 
+  // 加载更多日志的函数
   const loadMoreLogs = () => {
     if (!isMountedRef.current) return;
+
     setIsLoadingLogs(true);
+    // 模拟加载延迟，让用户看到加载效果
     setTimeout(() => {
       if (isMountedRef.current) {
         setVisibleLogsCount(prev => prev + LOGS_PER_PAGE);
@@ -73,245 +94,257 @@ export function MonitorDetail({ monitor }: MonitorDetailProps) {
     }, 300);
   };
 
+  // 计算监控创建日期（如果有）
   const createDate = monitor.createDatetime ? dayjs.unix(monitor.createDatetime) : null;
-  const monitorLink = monitor.url.startsWith("http") ? monitor.url : `https://${monitor.url}`;
+  const monitorLink = monitor.url.startsWith("http")
+    ? monitor.url
+    : `https://${monitor.url}`;
 
-  const linkButton = isLoggedIn ? (
+  const linkButton = isProtectionEnabled && !isLoggedIn ? (
+    <button
+      type="button"
+      onClick={() => setIsLoginModalOpen(true)}
+      className="inline-flex items-center justify-center rounded-full p-1.5 transition bg-slate-100 text-slate-400 hover:bg-slate-200"
+      title={t("auth.loginPrompt")}
+      aria-label={t("auth.loginPrompt")}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+      </svg>
+    </button>
+  ) : (
     <a
       href={monitorLink}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center justify-center rounded-full p-1.5 transition bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
-      style={{ textDecoration: "none" }}
       title={t("monitor.viewSite")}
       aria-label={t("monitor.viewSite")}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ height: "16px", width: "16px" }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
         <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
         <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
       </svg>
     </a>
-  ) : isProtectionEnabled ? (
-    <button
-      type="button"
-      onClick={() => setIsLoginModalOpen(true)}
-      className="inline-flex cursor-pointer items-center justify-center rounded-full p-1.5 shadow-sm transition bg-slate-100 text-slate-400 hover:bg-slate-200"
-      title={t("auth.loginPrompt")}
-      aria-label={t("auth.loginPrompt")}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ height: "16px", width: "16px" }}>
-        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-      </svg>
-    </button>
-  ) : null;
-
-  const summaryCardBg = monitor.status === "down"
-    ? "color-mix(in oklab, var(--danger), var(--surface) 88%)"
-    : monitor.status === "paused"
-      ? "color-mix(in oklab, var(--meta), var(--surface) 88%)"
-      : "color-mix(in oklab, var(--success), var(--surface) 88%)";
-
-  const summaryCardBorder = monitor.status === "down"
-    ? "color-mix(in oklab, var(--danger), var(--border) 72%)"
-    : monitor.status === "paused"
-      ? "color-mix(in oklab, var(--meta), var(--border) 72%)"
-      : "color-mix(in oklab, var(--success), var(--border) 72%)";
+  );
 
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-accent border-r-transparent"></div>
-          <p className="mt-4 text-muted">{language === "zh" ? "加载中..." : "Loading..."}</p>
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-emerald-600 border-r-transparent"></div>
+          <p className="mt-4 text-slate-600">加载监控详情中...</p>
         </div>
       </div>
     }>
-      <div className="min-h-screen bg-bg">
-        <TopNav onRequestLogin={() => setIsLoginModalOpen(true)} />
-
-        <main>
-          {/* Hero Section */}
-          <section className="hero">
-            <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(280px, .7fr)", gap: "var(--space-8)", alignItems: "end" }}>
-              <div>
-                <p className="eyebrow">MONITOR DETAIL · {monitor.type.toUpperCase()}</p>
-                <StatusBadge status={monitor.status} label={statusLabel} />
-                <h1 style={{ marginTop: "var(--space-5)" }}>{monitor.name}</h1>
-                <p style={{ marginTop: "var(--space-5)", maxWidth: "62ch", color: "var(--muted)", fontSize: "var(--text-lg)" }}>
-                  {monitor.incidents.total > 0
-                    ? language === "zh"
-                      ? `过去 90 天有 ${monitor.incidents.total} 次事件，累计 ${formatDuration(monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds)}。`
-                      : `${monitor.incidents.total} incidents in the past 90 days, ${formatDuration(monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds)} total.`
-                    : language === "zh"
-                      ? "过去 90 天无故障记录，服务运行正常。"
-                      : "No incidents in the past 90 days. Service is operational."}
-                </p>
-              </div>
-              <aside style={{
-                background: summaryCardBg,
-                border: `1px solid ${summaryCardBorder}`,
-                borderRadius: "var(--radius-lg)",
-                padding: "var(--space-6)",
-                boxShadow: "var(--elev-raised)",
-              }}>
-                <h3>{language === "zh" ? "服务摘要" : "Service summary"}</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "var(--space-3)", marginTop: "var(--space-5)" }}>
-                  <div style={{
-                    padding: "var(--space-4)",
-                    borderRadius: "var(--radius-md)",
-                    background: "color-mix(in oklab, var(--surface), transparent 10%)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <strong style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: "var(--text-2xl)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-                      {monitor.uptimeRatioLast90Days !== null
-                        ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
-                        : "—"}
-                    </strong>
-                    <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-                      {language === "zh" ? "90 天可用率" : "90-day uptime"}
-                    </span>
-                  </div>
-                  <div style={{
-                    padding: "var(--space-4)",
-                    borderRadius: "var(--radius-md)",
-                    background: "color-mix(in oklab, var(--surface), transparent 10%)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <strong style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: "var(--text-2xl)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-                      {monitor.responseTimes.length > 0
-                        ? `${monitor.responseTimes[monitor.responseTimes.length - 1].value}ms`
-                        : "—"}
-                    </strong>
-                    <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-                      {language === "zh" ? "当前响应" : "Current response"}
-                    </span>
-                  </div>
-                  <div style={{
-                    padding: "var(--space-4)",
-                    borderRadius: "var(--radius-md)",
-                    background: "color-mix(in oklab, var(--surface), transparent 10%)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <strong style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: "var(--text-2xl)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-                      {monitor.incidents.total}
-                    </strong>
-                    <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-                      {language === "zh" ? "近 90 天事件" : "90-day incidents"}
-                    </span>
-                  </div>
-                  <div style={{
-                    padding: "var(--space-4)",
-                    borderRadius: "var(--radius-md)",
-                    background: "color-mix(in oklab, var(--surface), transparent 10%)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <strong style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: "var(--text-2xl)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-                      {monitor.interval / 60}s
-                    </strong>
-                    <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-                      {language === "zh" ? "刷新间隔" : "Refresh interval"}
-                    </span>
-                  </div>
-                </div>
-              </aside>
+      <div className="min-h-screen bg-slate-100">
+        <div className="mx-auto w-full max-w-5xl px-6 py-10 space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-2">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-500"
+              >
+                <span>&larr;</span>
+                <span>{t("app.name")}</span>
+              </Link>
+              <h1 className="text-2xl font-semibold text-slate-900">
+                {monitor.name}
+              </h1>
+              <p className="text-sm text-slate-500">
+                {t("monitor.typeInterval", {
+                  type: monitor.type,
+                  interval: monitor.interval / 60,
+                })}
+              </p>
             </div>
-          </section>
+            <StatusBadge status={monitor.status} label={statusLabel} />
+          </div>
 
-          {/* Content Section */}
-          <section style={{ padding: "var(--space-8) 0 var(--section-y-desktop)" }}>
-            <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.45fr) minmax(310px, .75fr)", gap: "var(--space-6)", alignItems: "start" }}>
-              {/* Response Time Chart */}
-              {monitor.responseTimes.length > 0 && (
-                <section className="panel">
-                  <div className="panel-head">
-                    <div>
-                      <p className="eyebrow">RESPONSE TIME</p>
-                      <h2>{language === "zh" ? "响应时间趋势" : "Response trend"}</h2>
-                    </div>
-                  </div>
-                  <ResponseTimeChart responseTimes={monitor.responseTimes} />
-                </section>
-              )}
-
-              {/* Incident Log */}
-              <aside className="panel">
-                <div className="panel-head">
-                  <div>
-                    <p className="eyebrow">INCIDENTS</p>
-                    <h2>{language === "zh" ? "事件日志" : "Incident log"}</h2>
-                  </div>
+          <section className="grid gap-6 md:grid-cols-1">
+            <div className="space-y-4 rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
+              <div className="flex flex-col gap-2 text-sm text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span>{t("monitor.uptimeLast90")}</span>
+                  <strong>
+                    {monitor.uptimeRatioLast90Days !== null
+                      ? `${formatNumber(monitor.uptimeRatioLast90Days)}%`
+                      : "—"}
+                  </strong>
                 </div>
-                {sortedLogs.length > 0 ? (
-                  <div style={{ display: "grid", gap: "var(--space-3)" }}>
-                    {visibleLogs.map((log, index) => {
-                      const logTime = dayjs(log.datetime);
-                      const eventType = log.type === 1 ? "outage" : log.type === 2 ? "recovered" : "";
-                      const typeLabel = log.type === 1
-                        ? (language === "zh" ? "宕机" : "Down")
-                        : log.type === 2
-                          ? (language === "zh" ? "恢复" : "Recovered")
-                          : log.type === 99
-                            ? (language === "zh" ? "暂停" : "Paused")
-                            : (language === "zh" ? "启动" : "Started");
+                <div className="flex items-center justify-between">
+                  <span>{t("monitor.downDurationLast90")}</span>
+                  <strong>
+                    {monitor.downDurationLast90Days !== null
+                      ? formatDuration(monitor.downDurationLast90Days)
+                      : "—"}
+                  </strong>
+                </div>
+              </div>
 
-                      return (
-                        <article key={index} className={`event ${eventType}`}>
-                          <span className="event-marker"></span>
-                          <div>
-                            <div className="event-time">
-                              {logTime.format("MMM DD HH:mm")}
-                            </div>
-                            <strong>{typeLabel}</strong>
-                            {log.duration !== null && log.duration > 0 && (
-                              <span style={{ marginLeft: "var(--space-2)", color: "var(--meta)", fontSize: "var(--text-xs)" }}>
-                                ({formatDuration(log.duration)})
-                              </span>
-                            )}
-                            {log.reason && (log.reason.code || log.reason.detail) && (
-                              <div style={{ marginTop: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-                                {log.reason.detail || log.reason.code}
-                              </div>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                    {hasMoreLogs && (
-                      <button
-                        className="btn btn-primary"
-                        onClick={loadMoreLogs}
-                        disabled={isLoadingLogs}
-                        style={{ marginTop: "var(--space-4)" }}
-                      >
-                        {isLoadingLogs
-                          ? (language === "zh" ? "加载中..." : "Loading...")
-                          : (language === "zh" ? "加载更多" : "Load more")
-                        }
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{
-                    borderRadius: "var(--radius-md)",
-                    border: "1px dashed var(--border-soft)",
-                    background: "color-mix(in oklab, var(--surface), var(--bg) 22%)",
-                    padding: "var(--space-8)",
-                    textAlign: "center",
-                    color: "var(--muted)",
-                    fontSize: "var(--text-sm)",
-                  }}>
-                    {language === "zh" ? "暂无事件记录" : "No incidents recorded"}
+              <div className="flex flex-col gap-2 text-sm text-slate-600">
+                {/* 显示监控创建日期 */}
+                {createDate && (
+                  <div className="flex items-center justify-between">
+                    <span>创建日期</span>
+                    <strong>{createDate.format("YYYY-MM-DD HH:mm:ss")}</strong>
                   </div>
                 )}
-              </aside>
+              </div>
+
+              <p className="text-sm text-slate-500">
+                {monitor.incidents.total > 0 ||
+                  (monitor.downDurationLast90Days &&
+                    monitor.downDurationLast90Days > 0)
+                  ? monitor.incidents.downCount > 0 ||
+                    monitor.incidents.pauseCount > 0
+                    ? t("monitor.incidentsDetail", {
+                      downCount: monitor.incidents.downCount,
+                      pauseCount: monitor.incidents.pauseCount,
+                      duration: formatDuration(
+                        monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds,
+                      ),
+                    })
+                    : t("monitor.incidents", {
+                      count: monitor.incidents.total,
+                      duration: formatDuration(
+                        monitor.incidents.totalDowntimeSeconds + monitor.incidents.totalPausedSeconds,
+                      ),
+                    })
+                  : t("monitor.incidentsNone")}
+              </p>
+
+              <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  {monitor.lastCheckedAt
+                    ? dayjs(monitor.lastCheckedAt).format(
+                      "YYYY-MM-DD HH:mm:ss",
+                    )
+                    : ""}
+                </span>
+                {SHOW_LINKS ? linkButton : (
+                  <span className="text-slate-400">
+                    {t("monitor.linkDisabled")}
+                  </span>
+                )}
+              </div>
             </div>
           </section>
-        </main>
 
-        <Footer />
+          {/* 响应时间图表 */}
+          {monitor.responseTimes.length > 0 && (
+            <section className="rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
+              <h2 className="mb-4 text-lg font-semibold text-slate-800">
+                {t("monitor.responseChartTitle")}
+              </h2>
+              <ResponseTimeChart responseTimes={monitor.responseTimes} />
+            </section>
+          )}
+
+          {/* 最近事件日志 */}
+          <section className="rounded-3xl bg-white/90 p-6 shadow-soft ring-1 ring-emerald-100">
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">
+              事件日志
+              {monitor.logs.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-slate-500">
+                  （最近 {monitor.logs.length} 条）
+                </span>
+              )}
+            </h2>
+            {monitor.logs.length > 0 ? (
+              <div className="space-y-3">
+                {visibleLogs.map((log, index) => {
+                  const logTime = dayjs(log.datetime);
+                  const getLogTypeLabel = (type: number) => {
+                    switch (type) {
+                      case 1:
+                        return { label: "宕机 (Down)", color: "text-rose-600 bg-rose-50 border-rose-200" };
+                      case 2:
+                        return { label: "恢复 (Up)", color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
+                      case 99:
+                        return { label: "暂停 (Paused)", color: "text-amber-600 bg-amber-50 border-amber-200" };
+                      case 98:
+                        return { label: "启动 (Started)", color: "text-blue-600 bg-blue-50 border-blue-200" };
+                      default:
+                        return { label: `类型 ${type}`, color: "text-slate-600 bg-slate-50 border-slate-200" };
+                    }
+                  };
+                  const typeInfo = getLogTypeLabel(log.type);
+
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-lg border bg-white p-4 text-sm shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`rounded-lg border px-3 py-1 text-xs font-medium ${typeInfo.color}`}
+                          >
+                            {typeInfo.label}
+                          </span>
+                          <span className="font-mono text-slate-700">
+                            {logTime.format("YYYY-MM-DD HH:mm:ss")}
+                          </span>
+                        </div>
+                        {log.duration !== null && log.duration > 0 && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                            持续: {formatDuration(log.duration)}
+                          </span>
+                        )}
+                      </div>
+                      {log.reason && (log.reason.code || log.reason.detail) && (
+                        <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                          <span className="font-semibold text-slate-700">原因: </span>
+                          {log.reason.detail || log.reason.code}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* 加载更多按钮 */}
+                {hasMoreLogs && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={loadMoreLogs}
+                      disabled={isLoadingLogs || !isMountedRef.current}
+                      className="flex items-center gap-2 rounded-lg bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-200 disabled:opacity-70"
+                    >
+                      {isLoadingLogs ? (
+                        <>
+                          <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          加载中...
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                          </svg>
+                          加载更多日志
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 p-8 text-center text-sm text-slate-500">
+                <div className="mb-2">📋 暂无日志数据</div>
+                <div className="text-xs">监控尚未产生任何事件记录</div>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
       {isProtectionEnabled ? (
-        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+        />
       ) : null}
     </Suspense>
   );
@@ -322,13 +355,15 @@ interface ResponseTimeChartProps {
 }
 
 function ResponseTimeChart({ responseTimes }: ResponseTimeChartProps) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
 
   const chartData = useMemo(() => {
+    // 最多显示最近 200 个数据点，避免图表过于密集
     const sliced = responseTimes.slice(-200);
     return sliced.map((rt) => ({
       time: dayjs(rt.datetime).format("MM-DD HH:mm"),
       value: rt.value,
+      timestamp: dayjs(rt.datetime).valueOf(),
     }));
   }, [responseTimes]);
 
@@ -345,46 +380,38 @@ function ResponseTimeChart({ responseTimes }: ResponseTimeChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div style={{
-        borderRadius: "var(--radius-md)",
-        border: "1px dashed var(--border-soft)",
-        background: "color-mix(in oklab, var(--surface), var(--bg) 22%)",
-        padding: "var(--space-8)",
-        textAlign: "center",
-        color: "var(--muted)",
-        fontSize: "var(--text-sm)",
-      }}>
-        {language === "zh" ? "暂无响应时间数据" : "No response time data"}
+      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 p-8 text-center text-sm text-slate-500">
+        暂无响应时间数据
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gap: "var(--space-4)" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-        <span>{language === "zh" ? "平均" : "Avg"}: <strong style={{ color: "var(--fg)" }}>{avg}ms</strong></span>
-        <span>{language === "zh" ? "最大" : "Max"}: <strong style={{ color: "var(--fg)" }}>{max}ms</strong></span>
-        <span>{language === "zh" ? "最小" : "Min"}: <strong style={{ color: "var(--fg)" }}>{min}ms</strong></span>
-        <span style={{ color: "var(--meta)" }}>{chartData.length} {language === "zh" ? "个数据点" : "points"}</span>
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+        <span>平均: <strong className="text-slate-700">{avg}ms</strong></span>
+        <span>最大: <strong className="text-slate-700">{max}ms</strong></span>
+        <span>最小: <strong className="text-slate-700">{min}ms</strong></span>
+        <span className="text-slate-400">共 {chartData.length} 个数据点</span>
       </div>
-      <div style={{ height: "320px", width: "100%" }}>
+      <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--warn)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--warn)" stopOpacity={0} />
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 11, fill: "var(--meta)" }}
+              tick={{ fontSize: 11, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "var(--meta)" }}
+              tick={{ fontSize: 11, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => `${v}ms`}
@@ -392,24 +419,24 @@ function ResponseTimeChart({ responseTimes }: ResponseTimeChartProps) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                fontSize: "var(--text-xs)",
-                boxShadow: "var(--elev-raised)",
+                backgroundColor: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                fontSize: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
               }}
-              labelStyle={{ color: "var(--meta)", marginBottom: "4px" }}
-              formatter={(value: number) => [`${value}ms`, language === "zh" ? "响应时间" : "Response"]}
-              labelFormatter={(label) => `${language === "zh" ? "时间" : "Time"}: ${label}`}
+              labelStyle={{ color: "#64748b", marginBottom: "4px" }}
+              formatter={(value: number) => [`${value}ms`, "响应时间"]}
+              labelFormatter={(label) => `时间: ${label}`}
             />
             <Area
               type="monotone"
               dataKey="value"
-              stroke="var(--warn)"
+              stroke="#10b981"
               strokeWidth={1.5}
               fill="url(#responseGradient)"
               dot={false}
-              activeDot={{ r: 4, fill: "var(--warn)", strokeWidth: 2, stroke: "var(--surface)" }}
+              activeDot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
             />
           </AreaChart>
         </ResponsiveContainer>
