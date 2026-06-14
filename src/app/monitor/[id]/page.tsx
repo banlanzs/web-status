@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MonitorDetail } from "@/components/monitor-detail";
-import { ScrollToTop } from "@/components/scroll-to-top";
 import { useMonitors } from "@/components/providers/monitors-provider";
 import { SkeletonCard } from "@/components/loading";
 import type { NormalizedMonitor } from "@/types/uptimerobot";
@@ -75,7 +74,6 @@ export default function MonitorPage() {
       return (
         <div key={`monitor-${monitor.id}`} className="page-container">
           <MonitorDetail monitor={monitor} />
-          <ScrollToTop />
         </div>
       );
     } catch (error) {
